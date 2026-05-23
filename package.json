@@ -1,0 +1,16 @@
+{
+  "name": "metrics-server",
+  "version": "1.0.0",
+  "description": "Simple metrics server with uptime endpoint",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["metrics", "uptime"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
