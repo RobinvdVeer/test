@@ -55,9 +55,11 @@ async function createApp() {
   return app;
 }
 
+let server;
+
 async function start() {
   const app = await createApp();
-  const server = app.listen(config.port, () => {
+  server = app.listen(config.port, () => {
     console.log(`Metrics & Todo server running on http://localhost:${config.port}`);
     console.log(`Access metrics at http://localhost:${config.port}/metrics`);
     console.log(`Access todos at http://localhost:${config.port}/todos (requires JWT bearer token)`);
@@ -76,7 +78,11 @@ async function start() {
   });
 }
 
-start().catch((error) => {
-  console.error('Failed to start server:', error);
-  process.exit(1);
-});
+if (require.main === module) {
+  start().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
+}
+
+module.exports = { createApp, start, pool };
