@@ -7,6 +7,8 @@ This guide covers deployment scenarios for the Todo App backend at various scale
 ### Prerequisites
 - Node.js 18+
 - PostgreSQL 12+
+- A reachable OIDC identity provider with a JWKS/public key endpoint (Docker Compose provides Keycloak for local development)
+- A public OIDC client configured for authorization-code flow with PKCE
 
 ### Setup
 ```bash
@@ -16,8 +18,19 @@ npm install
 createdb tododb
 psql -U postgres tododb < init-db.sql
 
+# Point the API at your local OIDC provider. These values match the Docker Compose Keycloak realm.
+export AUTH_ISSUER=http://localhost:8080/realms/local-dev
+export PUBLIC_AUTH_ISSUER=http://localhost:8080/realms/local-dev
+export AUTH_JWKS_URI=http://localhost:8080/realms/local-dev/protocol/openid-connect/certs
+export AUTH_CLIENT_ID=todo-app
+export AUTH_AUDIENCE=todo-app
+export AUTH_REQUIRED_ROLE=user
+export CORS_ORIGIN=http://localhost:3000
+
 npm start
 ```
+
+When running the app outside Docker, make sure Keycloak or another compatible OIDC provider is already running and reachable at the configured URLs.
 
 ## Docker Compose (Local/Small Team)
 
@@ -31,10 +44,12 @@ docker-compose up --build
 ```
 
 This will:
-1. Start PostgreSQL container with persistent volume
+1. Start the todo PostgreSQL container with persistent volume
 2. Initialize schema from `init-db.sql`
-3. Start Node.js app
-4. Expose app on `http://localhost:3000`
+3. Start Keycloak with a dedicated PostgreSQL database and persistent volume
+4. Import the local `local-dev` realm with the `todo-app` public client and sample users
+5. Start Node.js app
+6. Expose app on `http://localhost:3000` and Keycloak on `http://localhost:8080`
 
 ### Teardown
 ```bash
@@ -57,6 +72,7 @@ docker-compose down
 **Setup:**
 - Deploy Node.js app to Kubernetes or ECS
 - Use managed PostgreSQL (RDS, Cloud SQL, Azure Database for PostgreSQL)
+- Use Keycloak or another OIDC provider with a public client configured for authorization-code + PKCE
 - Use container registry (ECR, Docker Hub, ACR)
 
 Example Kubernetes deployment:
@@ -86,6 +102,20 @@ spec:
             secretKeyRef:
               name: db-secret
               key: connection-string
+        - name: AUTH_ISSUER
+          value: https://idp.example.com/realms/prod
+        - name: PUBLIC_AUTH_ISSUER
+          value: https://idp.example.com/realms/prod
+        - name: AUTH_JWKS_URI
+          value: https://idp.example.com/realms/prod/protocol/openid-connect/certs
+        - name: AUTH_CLIENT_ID
+          value: todo-app
+        - name: AUTH_AUDIENCE
+          value: todo-app
+        - name: AUTH_REQUIRED_ROLE
+          value: user
+        - name: CORS_ORIGIN
+          value: https://app.example.com
         livenessProbe:
           httpGet:
             path: /health
@@ -203,12 +233,19 @@ curl http://your-app/metrics
 ### Security Considerations
 
 1. **API Security**
-   - ✅ User isolation via X-User-Id (replace with JWT in production)
+   - ✅ JWT bearer authentication for all todo endpoints
+   - ✅ RS256 token validation through the configured JWKS/public key endpoint
+   - ✅ Issuer and audience validation through `AUTH_ISSUER` and `AUTH_AUDIENCE`
+   - ✅ Role enforcement through `AUTH_REQUIRED_ROLE` (default: `user`)
+   - ✅ User isolation by JWT `sub` claim
    - ✅ Parameterized queries (prevents SQL injection)
+   - Configure Keycloak or another OIDC provider with authorization-code + PKCE for browser clients
+   - Keep access-token lifetimes short and use refresh-token rotation according to your IDP policy
+   - Store Keycloak admin credentials, database passwords, and app environment variables in a secrets manager
+   - Set `CORS_ORIGIN` to the exact frontend origin in production; avoid `*`
    - [ ] Add rate limiting
    - [ ] Add HTTPS/TLS
    - [ ] Add request body size limits
-   - [ ] Add CORS configuration
 
 2. **Database Security**
    - Use strong passwords for DB credentials
@@ -307,6 +344,13 @@ For thousands of concurrent users:
 PORT=3000
 DATABASE_URL=postgresql://todouser:todopass@localhost:5432/tododb
 NODE_ENV=development
+AUTH_ISSUER=http://localhost:8080/realms/local-dev
+PUBLIC_AUTH_ISSUER=http://localhost:8080/realms/local-dev
+AUTH_JWKS_URI=http://localhost:8080/realms/local-dev/protocol/openid-connect/certs
+AUTH_CLIENT_ID=todo-app
+AUTH_AUDIENCE=todo-app
+AUTH_REQUIRED_ROLE=user
+CORS_ORIGIN=http://localhost:3000
 ```
 
 ### Production
@@ -314,8 +358,17 @@ NODE_ENV=development
 PORT=3000
 DATABASE_URL=postgresql://user:password@prod-db.example.com:5432/tododb
 NODE_ENV=production
+AUTH_ISSUER=https://idp.example.com/realms/prod
+PUBLIC_AUTH_ISSUER=https://idp.example.com/realms/prod
+AUTH_JWKS_URI=https://idp.example.com/realms/prod/protocol/openid-connect/certs
+AUTH_CLIENT_ID=todo-app
+AUTH_AUDIENCE=todo-app
+AUTH_REQUIRED_ROLE=user
+CORS_ORIGIN=https://app.example.com
 LOG_LEVEL=info
 ```
+
+`AUTH_ISSUER` is the issuer the API expects in JWTs. `PUBLIC_AUTH_ISSUER` is returned by `/auth/config` for browser clients; keep it public-facing, especially when the API uses an internal service URL for `AUTH_JWKS_URI` in container networks.
 
 ## Backup and Recovery
 
