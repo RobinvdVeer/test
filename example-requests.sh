@@ -4,28 +4,17 @@
 # This script demonstrates how to use the Todo App API
 
 BASE_URL="http://localhost:3000"
-KEYCLOAK_URL="http://localhost:8080"
-REALM="local-dev"
-CLIENT_ID="todo-app"
-USERNAME="alice"
-PASSWORD="alicepass"
-
 echo "=== Todo App API Examples ==="
-echo "Fetching JWT for $USERNAME from Keycloak..."
-TOKEN=$(curl -s -X POST "$KEYCLOAK_URL/realms/$REALM/protocol/openid-connect/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "client_id=$CLIENT_ID" \
-  -d "grant_type=password" \
-  -d "username=$USERNAME" \
-  -d "password=$PASSWORD" | jq -r .access_token)
+TOKEN="${AUTH_TOKEN:-}"
 
-if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-  echo "Failed to get access token. Is docker compose running?"
+if [ -z "$TOKEN" ]; then
+  echo "Set AUTH_TOKEN to an access token obtained via the authorization-code + PKCE login flow."
+  echo "OIDC client configuration is available at $BASE_URL/auth/config."
   exit 1
 fi
 
 AUTH_HEADER="Authorization: Bearer $TOKEN"
-echo "Using authenticated user: $USERNAME"
+echo "Using supplied bearer token"
 echo ""
 
 # Health check
