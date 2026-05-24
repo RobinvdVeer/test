@@ -4,10 +4,28 @@
 # This script demonstrates how to use the Todo App API
 
 BASE_URL="http://localhost:3000"
-USER_ID="demo-user-$(date +%s)"
+KEYCLOAK_URL="http://localhost:8080"
+REALM="local-dev"
+CLIENT_ID="todo-app"
+USERNAME="alice"
+PASSWORD="alicepass"
 
 echo "=== Todo App API Examples ==="
-echo "Using User ID: $USER_ID"
+echo "Fetching JWT for $USERNAME from Keycloak..."
+TOKEN=$(curl -s -X POST "$KEYCLOAK_URL/realms/$REALM/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=$CLIENT_ID" \
+  -d "grant_type=password" \
+  -d "username=$USERNAME" \
+  -d "password=$PASSWORD" | jq -r .access_token)
+
+if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+  echo "Failed to get access token. Is docker compose running?"
+  exit 1
+fi
+
+AUTH_HEADER="Authorization: Bearer $TOKEN"
+echo "Using authenticated user: $USERNAME"
 echo ""
 
 # Health check
@@ -23,7 +41,7 @@ echo ""
 # Create first todo
 echo "3. Create a todo (work - high priority):"
 RESPONSE=$(curl -s -X POST "$BASE_URL/todos" \
-  -H "X-User-Id: $USER_ID" \
+  -H "$AUTH_HEADER" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Complete backend implementation",
@@ -39,7 +57,7 @@ echo ""
 # Create second todo
 echo "4. Create another todo (personal - medium priority):"
 RESPONSE=$(curl -s -X POST "$BASE_URL/todos" \
-  -H "X-User-Id: $USER_ID" \
+  -H "$AUTH_HEADER" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Grocery shopping",
@@ -54,7 +72,7 @@ echo ""
 # Create third todo
 echo "5. Create a completed todo:"
 curl -s -X POST "$BASE_URL/todos" \
-  -H "X-User-Id: $USER_ID" \
+  -H "$AUTH_HEADER" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Team meeting",
@@ -66,41 +84,41 @@ echo ""
 
 # List all todos
 echo "6. List all todos for the user:"
-curl -s -H "X-User-Id: $USER_ID" "$BASE_URL/todos" | jq .
+curl -s -H "$AUTH_HEADER" "$BASE_URL/todos" | jq .
 echo ""
 
 # List todos with filtering
 echo "7. List pending work todos:"
-curl -s -H "X-User-Id: $USER_ID" "$BASE_URL/todos?category=work&status=pending" | jq .
+curl -s -H "$AUTH_HEADER" "$BASE_URL/todos?category=work&status=pending" | jq .
 echo ""
 
 # Get specific todo (updates last_viewed)
 echo "8. Get a specific todo (ID: $TODO_ID_1):"
-curl -s -H "X-User-Id: $USER_ID" "$BASE_URL/todos/$TODO_ID_1" | jq .
+curl -s -H "$AUTH_HEADER" "$BASE_URL/todos/$TODO_ID_1" | jq .
 echo ""
 
 # Update todo
 echo "9. Update todo status to completed (ID: $TODO_ID_1):"
 curl -s -X PUT "$BASE_URL/todos/$TODO_ID_1" \
-  -H "X-User-Id: $USER_ID" \
+  -H "$AUTH_HEADER" \
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}' | jq .
 echo ""
 
 # Find forgotten todos (pending, sorted by least recently viewed)
 echo "10. Find forgotten todos (pending todos, least recently viewed first):"
-curl -s -H "X-User-Id: $USER_ID" "$BASE_URL/todos?status=pending&sort_by=last_viewed_asc" | jq .
+curl -s -H "$AUTH_HEADER" "$BASE_URL/todos?status=pending&sort_by=last_viewed_asc" | jq .
 echo ""
 
 # Delete a todo
 echo "11. Delete a todo (ID: $TODO_ID_2):"
 curl -s -X DELETE "$BASE_URL/todos/$TODO_ID_2" \
-  -H "X-User-Id: $USER_ID" | jq .
+  -H "$AUTH_HEADER" | jq .
 echo ""
 
 # List todos after deletion
 echo "12. List all todos after deletion:"
-curl -s -H "X-User-Id: $USER_ID" "$BASE_URL/todos" | jq .
+curl -s -H "$AUTH_HEADER" "$BASE_URL/todos" | jq .
 echo ""
 
 echo "=== Example complete ==="

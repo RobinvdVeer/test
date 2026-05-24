@@ -4,7 +4,7 @@ A multi-user todo application backend built with Express.js and PostgreSQL. Incl
 
 ## Features
 
-✅ **Multi-user support** - Users identified via X-User-Id header  
+✅ **OIDC/JWT authorization** - Todo endpoints require bearer tokens and isolate data by token subject  
 ✅ **Full CRUD operations** - Create, read, update, delete todos  
 ✅ **Categories and priorities** - Organize todos by category and priority level  
 ✅ **Status tracking** - Track todo completion status  
@@ -21,7 +21,9 @@ A multi-user todo application backend built with Express.js and PostgreSQL. Incl
 docker-compose up --build
 ```
 
-The app will be available at `http://localhost:3000`
+The app will be available at `http://localhost:3000`; Keycloak will be available at `http://localhost:8080`.
+
+Local Keycloak defaults: realm `local-dev`, public client `todo-app`, users `alice` / `alicepass` and `bob` / `bobpass`.
 
 ### Local Development
 ```bash
@@ -40,9 +42,17 @@ See [API.md](./API.md) for detailed API documentation.
 
 ### Quick Example
 ```bash
+# Get a local dev token
+TOKEN=$(curl -s -X POST http://localhost:8080/realms/local-dev/protocol/openid-connect/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'client_id=todo-app' \
+  -d 'grant_type=password' \
+  -d 'username=alice' \
+  -d 'password=alicepass' | jq -r .access_token)
+
 # Create a todo
 curl -X POST http://localhost:3000/todos \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Complete project",
@@ -51,7 +61,7 @@ curl -X POST http://localhost:3000/todos \
   }'
 
 # List todos
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?category=work"
 
 # Check metrics
 curl http://localhost:3000/metrics
@@ -60,9 +70,9 @@ curl http://localhost:3000/metrics
 ## Architecture
 
 ### Multi-user Design
-- Users are identified via the `X-User-Id` request header
+- Todo endpoints require OIDC JWT bearer tokens
+- Users are identified by the token `sub` claim
 - Each user has isolated todo data
-- Simple header-based identification (ready for future JWT integration)
 
 ### Database Schema
 - **users** table - Stores user information
@@ -98,6 +108,10 @@ The `init-db.sql` script automatically runs when starting Docker Compose, creati
 
 ### Environment Variables
 - `PORT` - Server port (default: 3000)
+- `AUTH_ISSUER` - Expected JWT issuer
+- `AUTH_JWKS_URI` - JWKS/public key endpoint used to validate tokens
+- `AUTH_CLIENT_ID` / `AUTH_AUDIENCE` - OIDC client and expected access-token audience
+- `AUTH_REQUIRED_ROLE` - Required role for todo endpoints (default: `user`)
 - `DATABASE_URL` - PostgreSQL connection string
 - `NODE_ENV` - Environment (development/production)
 

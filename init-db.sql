@@ -17,10 +17,7 @@ CREATE TABLE IF NOT EXISTS todos (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_viewed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-  INDEX idx_user_status (user_id, status),
-  INDEX idx_user_category (user_id, category),
-  INDEX idx_last_viewed (user_id, last_viewed)
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 -- Create indexes for better query performance

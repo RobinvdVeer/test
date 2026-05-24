@@ -1,8 +1,26 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { Pool } = require('pg');
+const jwt = require('jsonwebtoken');
+const jwksClient = require('jwks-rsa');
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const AUTH_ISSUER = process.env.AUTH_ISSUER || 'http://localhost:8080/realms/local-dev';
+const PUBLIC_AUTH_ISSUER = process.env.PUBLIC_AUTH_ISSUER || AUTH_ISSUER;
+const AUTH_CLIENT_ID = process.env.AUTH_CLIENT_ID || 'todo-app';
+const AUTH_AUDIENCE = process.env.AUTH_AUDIENCE || AUTH_CLIENT_ID;
+const AUTH_JWKS_URI = process.env.AUTH_JWKS_URI || `${AUTH_ISSUER}/protocol/openid-connect/certs`;
+const AUTH_REQUIRED_ROLE = process.env.AUTH_REQUIRED_ROLE || 'user';
+
+const jwks = jwksClient({
+  jwksUri: AUTH_JWKS_URI,
+  cache: true,
+  cacheMaxEntries: 5,
+  cacheMaxAge: 10 * 60 * 1000,
+  rateLimit: true,
+  jwksRequestsPerMinute: 10,
+});
 
 // Database connection pool
 const pool = new Pool({
@@ -11,22 +29,66 @@ const pool = new Pool({
 
 // Middleware
 app.use(bodyParser.json());
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*');
+  res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 
 // Store the process start time
 const startTime = Date.now();
 
-// Middleware to extract and validate user from header
-app.use((req, res, next) => {
-  const userId = req.headers['x-user-id'];
-  if (!userId) {
-    return res.status(400).json({ error: 'X-User-Id header is required' });
-  }
-  req.userId = userId;
-  next();
-});
+function getSigningKey(header, callback) {
+  jwks.getSigningKey(header.kid, (error, key) => {
+    if (error) return callback(error);
+    callback(null, key.getPublicKey());
+  });
+}
 
-// Middleware to ensure user exists in database
-app.use(async (req, res, next) => {
+function tokenRoles(decoded) {
+  return [
+    ...(decoded.realm_access?.roles || []),
+    ...Object.values(decoded.resource_access || {}).flatMap((access) => access.roles || []),
+  ];
+}
+
+// Middleware to validate JWT bearer tokens and extract the stable user id from sub.
+function authenticateJwt(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const [scheme, token] = authHeader.split(' ');
+
+  if (scheme !== 'Bearer' || !token) {
+    return res.status(401).json({ error: 'Bearer token is required' });
+  }
+
+  jwt.verify(
+    token,
+    getSigningKey,
+    {
+      algorithms: ['RS256'],
+      issuer: AUTH_ISSUER,
+      audience: AUTH_AUDIENCE,
+    },
+    (error, decoded) => {
+      if (error) {
+        return res.status(401).json({ error: 'Invalid or expired bearer token' });
+      }
+
+      if (AUTH_REQUIRED_ROLE && !tokenRoles(decoded).includes(AUTH_REQUIRED_ROLE)) {
+        return res.status(403).json({ error: `Required role '${AUTH_REQUIRED_ROLE}' is missing` });
+      }
+
+      req.auth = decoded;
+      req.userId = decoded.sub;
+      next();
+    }
+  );
+}
+
+// Middleware to ensure authenticated user exists in database
+async function ensureUserExists(req, res, next) {
   try {
     await pool.query(
       'INSERT INTO users (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
@@ -37,6 +99,22 @@ app.use(async (req, res, next) => {
     console.error('Error ensuring user exists:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+}
+
+app.use('/todos', authenticateJwt, ensureUserExists);
+
+// ==================== AUTH DISCOVERY ENDPOINT ====================
+
+app.get('/auth/config', (req, res) => {
+  res.json({
+    issuer: PUBLIC_AUTH_ISSUER,
+    clientId: AUTH_CLIENT_ID,
+    audience: AUTH_AUDIENCE,
+    authorizationEndpoint: `${PUBLIC_AUTH_ISSUER}/protocol/openid-connect/auth`,
+    tokenEndpoint: `${PUBLIC_AUTH_ISSUER}/protocol/openid-connect/token`,
+    logoutEndpoint: `${PUBLIC_AUTH_ISSUER}/protocol/openid-connect/logout`,
+    pkceMethod: 'S256',
+  });
 });
 
 // ==================== METRICS ENDPOINTS ====================
@@ -273,5 +351,6 @@ process.on('SIGTERM', () => {
 const server = app.listen(PORT, () => {
   console.log(`Metrics & Todo server running on http://localhost:${PORT}`);
   console.log(`Access metrics at http://localhost:${PORT}/metrics`);
-  console.log(`Access todos at http://localhost:${PORT}/todos (requires X-User-Id header)`);
+  console.log(`Access todos at http://localhost:${PORT}/todos (requires JWT bearer token)`);
+  console.log(`OIDC config at http://localhost:${PORT}/auth/config`);
 });

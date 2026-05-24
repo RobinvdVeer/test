@@ -1,7 +1,7 @@
 # Todo App API Documentation
 
 ## Overview
-This is a multi-user todo app backend built with Express.js and PostgreSQL. Users are identified via the `X-User-Id` header.
+This is a multi-user todo app backend built with Express.js and PostgreSQL. Todo endpoints require a JWT bearer token from the configured OIDC identity provider; users are identified by the token `sub` claim.
 
 ## Getting Started
 
@@ -12,8 +12,10 @@ docker-compose up --build
 
 This will:
 1. Start a PostgreSQL database with the todo schema initialized
-2. Build and run the Node.js application
-3. Expose the app on `http://localhost:3000`
+2. Start Keycloak plus a dedicated PostgreSQL database for Keycloak
+3. Import the local `local-dev` realm with `todo-app` public client and sample users
+4. Build and run the Node.js application
+5. Expose the app on `http://localhost:3000` and Keycloak on `http://localhost:8080`
 
 ### Running Locally
 ```bash
@@ -23,9 +25,26 @@ npm start
 ```
 
 ## Authentication
-All requests (except `/health` and `/metrics`) require the `X-User-Id` header:
+Todo endpoints require a JWT access token with the `user` role:
 ```
-X-User-Id: your-unique-user-id
+Authorization: Bearer <access-token>
+```
+
+Public endpoints: `/health`, `/metrics`, and `/auth/config`.
+
+Local dev Keycloak defaults:
+- Realm: `local-dev`
+- Public client: `todo-app` with authorization-code + PKCE (`S256`)
+- Users: `alice` / `alicepass`, `bob` / `bobpass`
+
+For quick local API testing, you can request a token with the dev-only password grant:
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/realms/local-dev/protocol/openid-connect/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'client_id=todo-app' \
+  -d 'grant_type=password' \
+  -d 'username=alice' \
+  -d 'password=alicepass' | jq -r .access_token)
 ```
 
 ## API Endpoints
@@ -53,7 +72,7 @@ Query parameters:
 
 Example:
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work&status=pending&sort_by=last_viewed_desc"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?category=work&status=pending&sort_by=last_viewed_desc"
 ```
 
 Response:
@@ -144,7 +163,7 @@ Response: `200 OK` with deleted todo details.
 
 ### Users Table
 - `id` - Auto-incremented primary key
-- `user_id` - Unique user identifier from X-User-Id header
+- `user_id` - Unique user identifier from the JWT `sub` claim
 - `created_at` - Account creation timestamp
 
 ### Todos Table
@@ -167,20 +186,20 @@ The `last_viewed` field tracks the last time a user viewed or interacted with a 
 
 Example query to find forgotten items:
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```
 
 This returns pending todos sorted by least recently viewed first.
 
 ## Error Responses
 
-### Missing X-User-Id Header
+### Missing Bearer Token
 ```json
 {
-  "error": "X-User-Id header is required"
+  "error": "Bearer token is required"
 }
 ```
-Status: `400 Bad Request`
+Status: `401 Unauthorized`
 
 ### Todo Not Found
 ```json
@@ -211,7 +230,7 @@ Status: `500 Internal Server Error`
 ### Create a todo
 ```bash
 curl -X POST http://localhost:3000/todos \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Design database schema",
@@ -223,18 +242,18 @@ curl -X POST http://localhost:3000/todos \
 
 ### List all pending todos in work category
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work&status=pending"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?category=work&status=pending"
 ```
 
 ### Mark a todo as completed
 ```bash
 curl -X PUT http://localhost:3000/todos/1 \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}'
 ```
 
 ### Find forgotten todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```
