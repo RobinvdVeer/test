@@ -2,6 +2,9 @@ const express = require('express');
 const todoRepository = require('../repositories/todoRepository');
 const userRepository = require('../repositories/userRepository');
 
+const DEFAULT_TODOS_LIMIT = 100;
+const MAX_TODOS_LIMIT = 500;
+
 function createTodosRouter({ pool, authenticateJwt }) {
   const router = express.Router();
 
@@ -17,7 +20,22 @@ function createTodosRouter({ pool, authenticateJwt }) {
 
   router.get('/', async (req, res) => {
     try {
-      const todos = await todoRepository.listTodos(pool, req.userId, req.query);
+      const requestedLimit = req.query.limit === undefined ? DEFAULT_TODOS_LIMIT : Number.parseInt(req.query.limit, 10);
+      const requestedOffset = req.query.offset === undefined ? 0 : Number.parseInt(req.query.offset, 10);
+
+      if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > MAX_TODOS_LIMIT) {
+        return res.status(400).json({ error: `limit must be an integer between 1 and ${MAX_TODOS_LIMIT}` });
+      }
+
+      if (!Number.isInteger(requestedOffset) || requestedOffset < 0) {
+        return res.status(400).json({ error: 'offset must be a non-negative integer' });
+      }
+
+      const todos = await todoRepository.listTodos(pool, req.userId, {
+        ...req.query,
+        limit: requestedLimit,
+        offset: requestedOffset,
+      });
       res.json(todos);
     } catch (error) {
       console.error('Error fetching todos:', error);

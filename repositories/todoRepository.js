@@ -14,7 +14,7 @@ function nullable(value) {
 }
 
 async function listTodos(pool, userId, filters = {}) {
-  const { category, status, sort_by } = filters;
+  const { category, status, sort_by, limit, offset } = filters;
   let query = 'SELECT * FROM todos WHERE user_id = $1';
   const params = [userId];
 
@@ -29,6 +29,11 @@ async function listTodos(pool, userId, filters = {}) {
   }
 
   query += ` ORDER BY ${SORT_OPTIONS[sort_by] || SORT_OPTIONS.last_viewed_desc}`;
+
+  if (limit !== undefined && offset !== undefined) {
+    params.push(limit, offset);
+    query += ` LIMIT $${params.length - 1} OFFSET $${params.length}`;
+  }
 
   const result = await pool.query(query, params);
   return result.rows;
