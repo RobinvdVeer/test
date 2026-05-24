@@ -18,12 +18,13 @@ A multi-user todo application backend built with Express.js and PostgreSQL. Incl
 
 ### With Docker Compose
 ```bash
+cp .env.example .env # optional: customize local dev defaults
 docker-compose up --build
 ```
 
 The app will be available at `http://localhost:3000`; Keycloak will be available at `http://localhost:8080`.
 
-Local Keycloak defaults: realm `local-dev`, public client `todo-app`, users `alice` / `alicepass` and `bob` / `bobpass`.
+Local Keycloak defaults: realm `local-dev`, public client `todo-app`, users `alice` / `alicepass` and `bob` / `bobpass`. Keep `.env` auth values aligned with `keycloak/realm-export.json` if you change the local realm, client, role, or port.
 
 ### Local Development
 ```bash
