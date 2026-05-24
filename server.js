@@ -5,13 +5,37 @@ const jwt = require('jsonwebtoken');
 const jwksClient = require('jwks-rsa');
 const app = express();
 const PORT = process.env.PORT || 3000;
+const isProduction = process.env.NODE_ENV === 'production';
 
-const AUTH_ISSUER = process.env.AUTH_ISSUER || 'http://localhost:8080/realms/local-dev';
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value && isProduction) {
+    throw new Error(`${name} must be set in production`);
+  }
+  return value;
+}
+
+function requireHttpsInProduction(name, value) {
+  if (isProduction && value && !value.startsWith('https://')) {
+    throw new Error(`${name} must use HTTPS in production`);
+  }
+}
+
+const AUTH_ISSUER = requiredEnv('AUTH_ISSUER') || 'http://localhost:8080/realms/local-dev';
 const PUBLIC_AUTH_ISSUER = process.env.PUBLIC_AUTH_ISSUER || AUTH_ISSUER;
 const AUTH_CLIENT_ID = process.env.AUTH_CLIENT_ID || 'todo-app';
-const AUTH_AUDIENCE = process.env.AUTH_AUDIENCE || AUTH_CLIENT_ID;
-const AUTH_JWKS_URI = process.env.AUTH_JWKS_URI || `${AUTH_ISSUER}/protocol/openid-connect/certs`;
+const AUTH_AUDIENCE = requiredEnv('AUTH_AUDIENCE') || AUTH_CLIENT_ID;
+const AUTH_JWKS_URI = requiredEnv('AUTH_JWKS_URI') || `${AUTH_ISSUER}/protocol/openid-connect/certs`;
 const AUTH_REQUIRED_ROLE = process.env.AUTH_REQUIRED_ROLE || 'user';
+const AUTH_ROLE_SOURCE = process.env.AUTH_ROLE_SOURCE || 'realm';
+const DATABASE_URL = requiredEnv('DATABASE_URL');
+
+if (!DATABASE_URL) {
+  throw new Error('DATABASE_URL must be set');
+}
+
+requireHttpsInProduction('AUTH_ISSUER', AUTH_ISSUER);
+requireHttpsInProduction('AUTH_JWKS_URI', AUTH_JWKS_URI);
 
 const jwks = jwksClient({
   jwksUri: AUTH_JWKS_URI,
@@ -24,18 +48,34 @@ const jwks = jwksClient({
 
 // Database connection pool
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://todouser:todopass@localhost:5432/tododb',
+  connectionString: DATABASE_URL,
 });
 
 // Middleware
-app.use(bodyParser.json());
+const corsOrigins = (process.env.CORS_ORIGIN || (isProduction ? '' : 'http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173'))
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (isProduction && corsOrigins.length === 0) {
+  throw new Error('CORS_ORIGIN must be set in production');
+}
+
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*');
+  const origin = req.headers.origin;
+  if (origin) {
+    if (!corsOrigins.includes(origin)) {
+      return res.sendStatus(403);
+    }
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+  }
   res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
+app.use(bodyParser.json({ limit: '16kb' }));
 
 // Store the process start time
 const startTime = Date.now();
@@ -47,11 +87,18 @@ function getSigningKey(header, callback) {
   });
 }
 
-function tokenRoles(decoded) {
-  return [
-    ...(decoded.realm_access?.roles || []),
-    ...Object.values(decoded.resource_access || {}).flatMap((access) => access.roles || []),
-  ];
+function hasRequiredRole(decoded) {
+  if (!AUTH_REQUIRED_ROLE) return true;
+
+  if (AUTH_ROLE_SOURCE === 'realm') {
+    return (decoded.realm_access?.roles || []).includes(AUTH_REQUIRED_ROLE);
+  }
+
+  if (AUTH_ROLE_SOURCE === 'client') {
+    return (decoded.resource_access?.[AUTH_CLIENT_ID]?.roles || []).includes(AUTH_REQUIRED_ROLE);
+  }
+
+  return false;
 }
 
 // Middleware to validate JWT bearer tokens and extract the stable user id from sub.
@@ -76,7 +123,7 @@ function authenticateJwt(req, res, next) {
         return res.status(401).json({ error: 'Invalid or expired bearer token' });
       }
 
-      if (AUTH_REQUIRED_ROLE && !tokenRoles(decoded).includes(AUTH_REQUIRED_ROLE)) {
+      if (!hasRequiredRole(decoded)) {
         return res.status(403).json({ error: `Required role '${AUTH_REQUIRED_ROLE}' is missing` });
       }
 
@@ -119,8 +166,11 @@ app.get('/auth/config', (req, res) => {
 
 // ==================== METRICS ENDPOINTS ====================
 
+const protectMetrics = isProduction || process.env.METRICS_REQUIRE_AUTH === 'true';
+const metricsMiddleware = protectMetrics ? [authenticateJwt] : [];
+
 // /metrics endpoint that returns process uptime
-app.get('/metrics', (req, res) => {
+app.get('/metrics', ...metricsMiddleware, (req, res) => {
   const uptime = (Date.now() - startTime) / 1000; // uptime in seconds
   
   res.json({

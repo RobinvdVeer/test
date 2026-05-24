@@ -18,12 +18,14 @@ A multi-user todo application backend built with Express.js and PostgreSQL. Incl
 
 ### With Docker Compose
 ```bash
+cp .env.example .env
+# Edit .env and choose local-only passwords
 docker-compose up --build
 ```
 
 The app will be available at `http://localhost:3000`; Keycloak will be available at `http://localhost:8080`.
 
-Local Keycloak defaults: realm `local-dev`, public client `todo-app`, users `alice` / `alicepass` and `bob` / `bobpass`.
+Local Keycloak defaults: realm `local-dev`, public client `todo-app`. Use the authorization-code + PKCE flow to sign in.
 
 ### Local Development
 ```bash
@@ -31,10 +33,7 @@ npm install
 npm start
 ```
 
-Requires PostgreSQL running on `localhost:5432` with credentials:
-- User: `todouser`
-- Password: `todopass`
-- Database: `tododb`
+Requires `DATABASE_URL` to be set to a PostgreSQL connection string.
 
 ## API Documentation
 
@@ -42,17 +41,12 @@ See [API.md](./API.md) for detailed API documentation.
 
 ### Quick Example
 ```bash
-# Get a local dev token
-TOKEN=$(curl -s -X POST http://localhost:8080/realms/local-dev/protocol/openid-connect/token \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d 'client_id=todo-app' \
-  -d 'grant_type=password' \
-  -d 'username=alice' \
-  -d 'password=alicepass' | jq -r .access_token)
+# Obtain an access token via authorization-code + PKCE, then export it:
+export AUTH_TOKEN='<access-token>'
 
 # Create a todo
 curl -X POST http://localhost:3000/todos \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Complete project",
@@ -61,7 +55,7 @@ curl -X POST http://localhost:3000/todos \
   }'
 
 # List todos
-curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?category=work"
+curl -H "Authorization: Bearer $AUTH_TOKEN" "http://localhost:3000/todos?category=work"
 
 # Check metrics
 curl http://localhost:3000/metrics
@@ -112,7 +106,10 @@ The `init-db.sql` script automatically runs when starting Docker Compose, creati
 - `AUTH_JWKS_URI` - JWKS/public key endpoint used to validate tokens
 - `AUTH_CLIENT_ID` / `AUTH_AUDIENCE` - OIDC client and expected access-token audience
 - `AUTH_REQUIRED_ROLE` - Required role for todo endpoints (default: `user`)
-- `DATABASE_URL` - PostgreSQL connection string
+- `AUTH_ROLE_SOURCE` - Role source, either `realm` or `client` (default: `realm`)
+- `CORS_ORIGIN` - Comma-separated allowed browser origins (required in production)
+- `METRICS_REQUIRE_AUTH` - Set to `true` to protect `/metrics` outside production
+- `DATABASE_URL` - PostgreSQL connection string (required)
 - `NODE_ENV` - Environment (development/production)
 
 ### File Structure
@@ -142,7 +139,6 @@ The `init-db.sql` script automatically runs when starting Docker Compose, creati
 - Last viewed tracking enables efficient discovery of forgotten tasks
 
 ## Future Enhancements
-- JWT-based authentication
 - Due dates and reminders
 - Sharing and collaboration features
 - Recurring tasks

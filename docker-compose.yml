@@ -1,3 +1,4 @@
+# Local development compose file only. Do not use for staging/production.
 version: '3.8'
 
 services:
@@ -6,10 +7,8 @@ services:
     container_name: todo_postgres
     environment:
       POSTGRES_USER: todouser
-      POSTGRES_PASSWORD: todopass
+      POSTGRES_PASSWORD: ${TODO_POSTGRES_PASSWORD:?Set TODO_POSTGRES_PASSWORD in .env}
       POSTGRES_DB: tododb
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
@@ -24,10 +23,8 @@ services:
     container_name: keycloak_postgres
     environment:
       POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: keycloakpass
+      POSTGRES_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD:?Set KEYCLOAK_POSTGRES_PASSWORD in .env}
       POSTGRES_DB: keycloak
-    ports:
-      - "5433:5432"
     volumes:
       - keycloak_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -42,11 +39,11 @@ services:
     command: start-dev --import-realm --hostname=http://localhost:8080
     environment:
       KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: keycloakpass
+      KC_DB_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD:?Set KEYCLOAK_POSTGRES_PASSWORD in .env}
       KC_HTTP_ENABLED: "true"
       KC_HOSTNAME_STRICT: "false"
     ports:
@@ -63,7 +60,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://todouser:todopass@postgres:5432/tododb
+      DATABASE_URL: postgresql://todouser:${TODO_POSTGRES_PASSWORD:?Set TODO_POSTGRES_PASSWORD in .env}@postgres:5432/tododb
       NODE_ENV: development
       AUTH_ISSUER: http://localhost:8080/realms/local-dev
       PUBLIC_AUTH_ISSUER: http://localhost:8080/realms/local-dev
@@ -71,6 +68,7 @@ services:
       AUTH_CLIENT_ID: todo-app
       AUTH_AUDIENCE: todo-app
       AUTH_REQUIRED_ROLE: user
+      AUTH_ROLE_SOURCE: realm
     depends_on:
       postgres:
         condition: service_healthy

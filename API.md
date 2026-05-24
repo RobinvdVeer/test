@@ -7,6 +7,8 @@ This is a multi-user todo app backend built with Express.js and PostgreSQL. Todo
 
 ### Running with Docker Compose
 ```bash
+cp .env.example .env
+# Edit .env and choose local-only passwords
 docker-compose up --build
 ```
 
@@ -30,21 +32,15 @@ Todo endpoints require a JWT access token with the `user` role:
 Authorization: Bearer <access-token>
 ```
 
-Public endpoints: `/health`, `/metrics`, and `/auth/config`.
+Public endpoints: `/health` and `/auth/config`. `/metrics` is public in local development but requires authentication in production or when `METRICS_REQUIRE_AUTH=true`.
 
 Local dev Keycloak defaults:
 - Realm: `local-dev`
 - Public client: `todo-app` with authorization-code + PKCE (`S256`)
-- Users: `alice` / `alicepass`, `bob` / `bobpass`
 
-For quick local API testing, you can request a token with the dev-only password grant:
+Obtain an access token through the authorization-code + PKCE flow, then pass it as a bearer token:
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:8080/realms/local-dev/protocol/openid-connect/token \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d 'client_id=todo-app' \
-  -d 'grant_type=password' \
-  -d 'username=alice' \
-  -d 'password=alicepass' | jq -r .access_token)
+export AUTH_TOKEN='<access-token>'
 ```
 
 ## API Endpoints
@@ -72,7 +68,7 @@ Query parameters:
 
 Example:
 ```bash
-curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?category=work&status=pending&sort_by=last_viewed_desc"
+curl -H "Authorization: Bearer $AUTH_TOKEN" "http://localhost:3000/todos?category=work&status=pending&sort_by=last_viewed_desc"
 ```
 
 Response:
@@ -186,7 +182,7 @@ The `last_viewed` field tracks the last time a user viewed or interacted with a 
 
 Example query to find forgotten items:
 ```bash
-curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $AUTH_TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```
 
 This returns pending todos sorted by least recently viewed first.
@@ -230,7 +226,7 @@ Status: `500 Internal Server Error`
 ### Create a todo
 ```bash
 curl -X POST http://localhost:3000/todos \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Design database schema",
@@ -242,18 +238,18 @@ curl -X POST http://localhost:3000/todos \
 
 ### List all pending todos in work category
 ```bash
-curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?category=work&status=pending"
+curl -H "Authorization: Bearer $AUTH_TOKEN" "http://localhost:3000/todos?category=work&status=pending"
 ```
 
 ### Mark a todo as completed
 ```bash
 curl -X PUT http://localhost:3000/todos/1 \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}'
 ```
 
 ### Find forgotten todos
 ```bash
-curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $AUTH_TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```
