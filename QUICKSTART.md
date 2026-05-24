@@ -4,13 +4,29 @@
 
 ### Prerequisites
 - Docker and Docker Compose installed
+- `jq` installed for the token examples
 
 ### Start the Application
 ```bash
 docker-compose up --build
 ```
 
-The app will be available at `http://localhost:3000`
+This starts the app, the todo PostgreSQL database, Keycloak, and Keycloak's dedicated PostgreSQL database.
+
+The app will be available at `http://localhost:3000`; Keycloak will be available at `http://localhost:8080`.
+
+## Get a Local Dev Token
+
+Todo endpoints require a JWT bearer token. The local Keycloak realm includes a public `todo-app` client and two sample users: `alice` / `alicepass` and `bob` / `bobpass`.
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/realms/local-dev/protocol/openid-connect/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'client_id=todo-app' \
+  -d 'grant_type=password' \
+  -d 'username=alice' \
+  -d 'password=alicepass' | jq -r .access_token)
+```
 
 ## Common Commands
 
@@ -19,10 +35,15 @@ The app will be available at `http://localhost:3000`
 curl http://localhost:3000/health
 ```
 
+### Check Frontend Auth Config
+```bash
+curl http://localhost:3000/auth/config | jq
+```
+
 ### Create a Todo
 ```bash
 curl -X POST http://localhost:3000/todos \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Buy groceries",
@@ -33,28 +54,28 @@ curl -X POST http://localhost:3000/todos \
 
 ### List Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos"
 ```
 
 ### List Work Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?category=work"
 ```
 
 ### List Pending Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?status=pending"
 ```
 
 ### Find Forgotten Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```
 
 ### Mark Todo as Complete
 ```bash
 curl -X PUT http://localhost:3000/todos/1 \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}'
 ```
@@ -62,7 +83,7 @@ curl -X PUT http://localhost:3000/todos/1 \
 ### Delete a Todo
 ```bash
 curl -X DELETE http://localhost:3000/todos/1 \
-  -H "X-User-Id: user123"
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Run Example Script
@@ -73,10 +94,12 @@ chmod +x example-requests.sh
 
 ## Important Notes
 
-### User Identification
-- All todo endpoints require the `X-User-Id` header
-- Each user gets isolated data
-- Example: `X-User-Id: user123`
+### Authentication and User Isolation
+- All todo endpoints require `Authorization: Bearer <access-token>`.
+- Tokens are issued by the configured OIDC identity provider. Local Docker Compose uses Keycloak realm `local-dev`.
+- The API validates JWTs with the provider's JWKS/public key endpoint and requires the `user` role by default.
+- Each user's todos are isolated by the token `sub` claim.
+- `/health`, `/metrics`, and `/auth/config` are public endpoints.
 
 ### Status Values
 - `pending` - Not started
@@ -99,17 +122,24 @@ Default is `last_viewed_desc` (most recently viewed first)
 
 ## Database Access
 
-**Inside Docker:**
+**Todo PostgreSQL inside Docker:**
 - Host: `postgres`
 - Port: `5432`
 - User: `todouser`
 - Password: `todopass`
 - Database: `tododb`
 
-**From localhost:**
+**Todo PostgreSQL from localhost:**
 ```bash
 psql -h localhost -U todouser -d tododb
 ```
+
+**Keycloak PostgreSQL from localhost:**
+- Host: `localhost`
+- Port: `5433`
+- User: `keycloak`
+- Password: `keycloakpass`
+- Database: `keycloak`
 
 ## Documentation
 
@@ -135,12 +165,22 @@ docker-compose up --build
 
 ### Database connection error
 ```bash
-# Wait for database to be ready
+# Wait for databases to be ready
 docker-compose ps
-# Status should show "healthy" for postgres
+# Status should show "healthy" for postgres and keycloak-postgres
 
 # Check database logs
 docker-compose logs postgres
+docker-compose logs keycloak-postgres
+```
+
+### Token request fails
+```bash
+# Check Keycloak logs and wait for realm import to finish
+docker-compose logs keycloak
+
+# Verify the realm is reachable
+curl http://localhost:8080/realms/local-dev/.well-known/openid-configuration | jq
 ```
 
 ### Port already in use
@@ -151,7 +191,9 @@ docker-compose logs postgres
 
 # If port 5432 is in use:
 # ports:
-#   - "5433:5432"  # Use 5433 instead
+#   - "5434:5432"  # Use another host port for todo Postgres
+
+# If port 8080 is in use, change the Keycloak host port and update PUBLIC_AUTH_ISSUER accordingly.
 ```
 
 ## Next Steps

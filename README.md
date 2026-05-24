@@ -89,6 +89,7 @@ curl http://localhost:3000/metrics
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | GET | `/metrics` | Process metrics |
+| GET | `/auth/config` | Public OIDC client configuration for browser PKCE flows |
 | GET | `/todos` | List todos (with filtering) |
 | POST | `/todos` | Create todo |
 | GET | `/todos/:id` | Get todo (updates last_viewed) |
@@ -102,11 +103,12 @@ The `init-db.sql` script automatically runs when starting Docker Compose, creati
 
 ### Environment Variables
 - `PORT` - Server port (default: 3000)
-- `AUTH_ISSUER` - Expected JWT issuer
+- `AUTH_ISSUER` - Expected JWT issuer used during server-side token validation
+- `PUBLIC_AUTH_ISSUER` - Browser-visible issuer used in `/auth/config`; set this when the server validates tokens through an internal Docker URL but clients must use a public URL
 - `AUTH_JWKS_URI` - JWKS/public key endpoint used to validate tokens
 - `AUTH_CLIENT_ID` / `AUTH_AUDIENCE` - OIDC client and expected access-token audience
 - `AUTH_REQUIRED_ROLE` - Required role for todo endpoints (default: `user`)
-- `AUTH_ROLE_SOURCE` - Role source, either `realm` or `client` (default: `realm`)
+- `AUTH_ROLES_CLAIM` / `AUTH_CLIENT_ROLES_CLAIM` - Token claim paths used to find realm/client roles
 - `CORS_ORIGIN` - Comma-separated allowed browser origins (required in production)
 - `METRICS_REQUIRE_AUTH` - Set to `true` to protect `/metrics` outside production
 - `DATABASE_URL` - PostgreSQL connection string (required)
@@ -139,6 +141,7 @@ The `init-db.sql` script automatically runs when starting Docker Compose, creati
 - Last viewed tracking enables efficient discovery of forgotten tasks
 
 ## Future Enhancements
+- Additional authorization policies and role-based administration
 - Due dates and reminders
 - Sharing and collaboration features
 - Recurring tasks

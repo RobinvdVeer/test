@@ -50,7 +50,7 @@ Complete workflow examples in a single executable script.
 ### Docker & Database
 | File | Purpose |
 |------|---------|
-| `docker-compose.yml` | Docker Compose configuration (app + database) |
+| `docker-compose.yml` | Docker Compose configuration (app + todo database + Keycloak + Keycloak database) |
 | `Dockerfile` | Docker image for the Node.js app |
 | `init-db.sql` | PostgreSQL schema initialization script |
 
@@ -82,7 +82,14 @@ docker-compose up --build
 
 ### Test It Works
 ```bash
-curl -H "X-User-Id: user123" http://localhost:3000/todos
+TOKEN=$(curl -s -X POST http://localhost:8080/realms/local-dev/protocol/openid-connect/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'client_id=todo-app' \
+  -d 'grant_type=password' \
+  -d 'username=alice' \
+  -d 'password=alicepass' | jq -r .access_token)
+
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/todos
 ```
 
 ### Run Examples
@@ -102,23 +109,25 @@ docker-compose down
 ```
 ┌─────────────────────────────────────────────────┐
 │           Client Application                    │
-└─────────────┬───────────────────────────────────┘
-              │ X-User-Id Header
-              ▼
-┌─────────────────────────────────────────────────┐
-│      Node.js / Express Server (3000)            │
-│  ├─ /health (health check)                      │
-│  ├─ /metrics (uptime, CPU, memory)              │
-│  ├─ GET /todos (list with filtering)            │
-│  ├─ POST /todos (create)                        │
-│  ├─ GET /todos/:id (get + update last_viewed)   │
-│  ├─ PUT /todos/:id (update)                     │
-│  └─ DELETE /todos/:id (delete)                  │
-└──────────┬──────────────────────────────────────┘
+│  └─ Gets OIDC config from /auth/config          │
+└───────┬──────────────────────────────┬──────────┘
+        │ Authorization: Bearer <JWT>  │ PKCE login/token
+        ▼                              ▼
+┌─────────────────────────────────┐  ┌──────────────────────────────┐
+│ Node.js / Express Server (3000) │  │ Keycloak (8080) + DB (5433)  │
+│ ├─ /health                      │  │ local-dev realm, todo-app    │
+│ ├─ /metrics                     │  │ client, sample users         │
+│ ├─ /auth/config                 │  └──────────────────────────────┘
+│ ├─ GET /todos                   │
+│ ├─ POST /todos                  │
+│ ├─ GET /todos/:id               │
+│ ├─ PUT /todos/:id               │
+│ └─ DELETE /todos/:id            │
+└──────────┬──────────────────────┘
            │ Connection Pool (pg)
            ▼
 ┌─────────────────────────────────────────────────┐
-│        PostgreSQL Database (5432)               │
+│        Todo PostgreSQL Database (5432)          │
 │  ├─ Users Table (user_id, created_at)           │
 │  └─ Todos Table                                 │
 │      ├─ Title, Description, Category            │
@@ -132,10 +141,11 @@ docker-compose down
 
 ## Key Features
 
-✅ **Multi-user Support**
-- Users identified via `X-User-Id` header
+✅ **OIDC/JWT Authorization**
+- Todo endpoints require JWT bearer tokens
+- Tokens are validated through the configured JWKS/public key endpoint
+- Users are identified by the token `sub` claim
 - Data isolation per user
-- Ready for JWT integration
 
 ✅ **Full CRUD Operations**
 - Create, read, update, delete todos
@@ -149,6 +159,7 @@ docker-compose down
 
 ✅ **Production Ready**
 - PostgreSQL database
+- Keycloak-backed local OIDC setup
 - Connection pooling
 - Parameterized queries (SQL injection prevention)
 - Proper error handling
@@ -238,22 +249,19 @@ docker-compose down
 A: No! Just run `docker-compose up --build` and it works.
 
 **Q: How do I know the user ID?**
-A: You make it up! Any string works: `user123`, `john@example.com`, `user-abc-123`, etc.
+A: The API uses the JWT `sub` claim from the authenticated user. In local Docker Compose, use `alice` / `alicepass` or `bob` / `bobpass` to get a token from Keycloak.
 
 **Q: Can multiple users use this?**
-A: Yes! Each user gets isolated data via the X-User-Id header.
+A: Yes! Each user gets isolated data via the JWT subject (`sub`) claim.
 
 **Q: Is this ready for production?**
 A: The code is production-ready. See DEPLOYMENT.md for hardening steps.
 
 **Q: Can I use this as-is or do I need to modify it?**
-A: You can use it as-is, but see DEPLOYMENT.md for recommended additions (auth, rate limiting, logging, etc).
+A: You can use it as-is locally with the included Keycloak realm. See DEPLOYMENT.md for production OIDC, secrets, rate limiting, and logging guidance.
 
 **Q: What's the forgotten items feature?**
 A: The `last_viewed` field tracks when users last viewed a todo. Sort by `last_viewed_asc` to find pending todos that haven't been reviewed in a while.
-
-**Q: How do I migrate to JWT authentication?**
-A: See DEPLOYMENT.md security section for JWT migration path.
 
 ---
 

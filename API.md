@@ -57,6 +57,34 @@ GET /metrics
 ```
 Returns process uptime, memory usage, and CPU usage.
 
+### Auth Config
+```
+GET /auth/config
+```
+Returns the public OIDC settings a browser client needs to start an authorization-code flow with PKCE. This endpoint is intentionally unauthenticated.
+
+Example response:
+```json
+{
+  "issuer": "http://localhost:8080/realms/local-dev",
+  "clientId": "todo-app",
+  "audience": "todo-app",
+  "authorizationEndpoint": "http://localhost:8080/realms/local-dev/protocol/openid-connect/auth",
+  "tokenEndpoint": "http://localhost:8080/realms/local-dev/protocol/openid-connect/token",
+  "logoutEndpoint": "http://localhost:8080/realms/local-dev/protocol/openid-connect/logout",
+  "pkceMethod": "S256"
+}
+```
+
+Stable fields for clients are `issuer`, `clientId`, `authorizationEndpoint`, `tokenEndpoint`, `logoutEndpoint`, and `pkceMethod`. `audience` documents what the API validates in access tokens.
+
+Browser PKCE flow outline:
+1. Fetch `/auth/config`.
+2. Generate a code verifier and S256 code challenge in the browser.
+3. Send the user to `authorizationEndpoint` with `client_id`, `redirect_uri`, `response_type=code`, `scope=openid`, `code_challenge`, `code_challenge_method=S256`, and `state`.
+4. After the callback, exchange the authorization code at `tokenEndpoint` with the original verifier.
+5. Call todo endpoints with `Authorization: Bearer <access-token>`.
+
 ### List Todos
 ```
 GET /todos
