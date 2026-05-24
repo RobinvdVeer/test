@@ -12,6 +12,8 @@ const AUTH_CLIENT_ID = process.env.AUTH_CLIENT_ID || 'todo-app';
 const AUTH_AUDIENCE = process.env.AUTH_AUDIENCE || AUTH_CLIENT_ID;
 const AUTH_JWKS_URI = process.env.AUTH_JWKS_URI || `${AUTH_ISSUER}/protocol/openid-connect/certs`;
 const AUTH_REQUIRED_ROLE = process.env.AUTH_REQUIRED_ROLE || 'user';
+const DEFAULT_TODOS_LIMIT = 100;
+const MAX_TODOS_LIMIT = 500;
 
 const jwks = jwksClient({
   jwksUri: AUTH_JWKS_URI,
@@ -87,21 +89,7 @@ function authenticateJwt(req, res, next) {
   );
 }
 
-// Middleware to ensure authenticated user exists in database
-async function ensureUserExists(req, res, next) {
-  try {
-    await pool.query(
-      'INSERT INTO users (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
-      [req.userId]
-    );
-    next();
-  } catch (error) {
-    console.error('Error ensuring user exists:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
-
-app.use('/todos', authenticateJwt, ensureUserExists);
+app.use('/todos', authenticateJwt);
 
 // ==================== AUTH DISCOVERY ENDPOINT ====================
 
@@ -147,6 +135,17 @@ app.get('/health', (req, res) => {
 app.get('/todos', async (req, res) => {
   try {
     const { category, status, sort_by } = req.query;
+    const requestedLimit = req.query.limit === undefined ? DEFAULT_TODOS_LIMIT : Number.parseInt(req.query.limit, 10);
+    const requestedOffset = req.query.offset === undefined ? 0 : Number.parseInt(req.query.offset, 10);
+
+    if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > MAX_TODOS_LIMIT) {
+      return res.status(400).json({ error: `limit must be an integer between 1 and ${MAX_TODOS_LIMIT}` });
+    }
+
+    if (!Number.isInteger(requestedOffset) || requestedOffset < 0) {
+      return res.status(400).json({ error: 'offset must be a non-negative integer' });
+    }
+
     let query = 'SELECT * FROM todos WHERE user_id = $1';
     const params = [req.userId];
     let paramCount = 1;
@@ -186,6 +185,9 @@ app.get('/todos', async (req, res) => {
         query += ' ORDER BY last_viewed DESC';
     }
 
+    query += ` LIMIT $${++paramCount} OFFSET $${++paramCount}`;
+    params.push(requestedLimit, requestedOffset);
+
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
@@ -204,7 +206,13 @@ app.post('/todos', async (req, res) => {
     }
 
     const result = await pool.query(
-      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+      `WITH ensured_user AS (
+        INSERT INTO users (user_id) VALUES ($1)
+        ON CONFLICT (user_id) DO NOTHING
+      )
+      INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      RETURNING *`,
       [req.userId, title, description || null, category || null, status || 'pending', priority || 'medium']
     );
 
@@ -243,18 +251,6 @@ app.put('/todos/:id', async (req, res) => {
     const { id } = req.params;
     const { title, description, category, status, priority } = req.body;
 
-    // First, check if todo exists and belongs to user
-    const checkResult = await pool.query(
-      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-      [id, req.userId]
-    );
-
-    if (checkResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Todo not found' });
-    }
-
-    const currentTodo = checkResult.rows[0];
-
     // Update only provided fields
     const updateFields = [];
     const updateValues = [];
@@ -291,6 +287,10 @@ app.put('/todos/:id', async (req, res) => {
 
     const query = `UPDATE todos SET ${updateFields.join(', ')} WHERE id = $${paramCount++} AND user_id = $${paramCount++} RETURNING *`;
     const result = await pool.query(query, updateValues);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
 
     res.json(result.rows[0]);
   } catch (error) {
