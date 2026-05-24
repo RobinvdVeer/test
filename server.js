@@ -1,406 +1,82 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const { Pool } = require('pg');
-const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-rsa');
-const app = express();
-const PORT = process.env.PORT || 3000;
-const isProduction = process.env.NODE_ENV === 'production';
+const config = require('./config');
+const pool = require('./db/pool');
+const { discoverOidcMetadata } = require('./auth/oidcDiscovery');
+const { createAuthenticateJwt } = require('./auth/middleware');
+const createAuthRouter = require('./routes/auth');
+const { createMetricsRouter } = require('./routes/metrics');
+const createTodosRouter = require('./routes/todos');
 
-function requiredEnv(name) {
-  const value = process.env[name];
-  if (!value && isProduction) {
-    throw new Error(`${name} must be set in production`);
-  }
-  return value;
-}
+function configureCors(app) {
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
 
-function requireHttpsInProduction(name, value) {
-  if (isProduction && value && !value.startsWith('https://')) {
-    throw new Error(`${name} must use HTTPS in production`);
-  }
-}
-
-const AUTH_ISSUER = requiredEnv('AUTH_ISSUER') || 'http://localhost:8080/realms/local-dev';
-const PUBLIC_AUTH_ISSUER = process.env.PUBLIC_AUTH_ISSUER || AUTH_ISSUER;
-const AUTH_CLIENT_ID = process.env.AUTH_CLIENT_ID || 'todo-app';
-const AUTH_AUDIENCE = requiredEnv('AUTH_AUDIENCE') || AUTH_CLIENT_ID;
-const AUTH_JWKS_URI = requiredEnv('AUTH_JWKS_URI') || `${AUTH_ISSUER}/protocol/openid-connect/certs`;
-const AUTH_REQUIRED_ROLE = process.env.AUTH_REQUIRED_ROLE || 'user';
-const AUTH_ROLE_SOURCE = process.env.AUTH_ROLE_SOURCE || 'realm';
-const DATABASE_URL = requiredEnv('DATABASE_URL');
-
-if (!DATABASE_URL) {
-  throw new Error('DATABASE_URL must be set');
-}
-
-requireHttpsInProduction('AUTH_ISSUER', AUTH_ISSUER);
-requireHttpsInProduction('AUTH_JWKS_URI', AUTH_JWKS_URI);
-
-const jwks = jwksClient({
-  jwksUri: AUTH_JWKS_URI,
-  cache: true,
-  cacheMaxEntries: 5,
-  cacheMaxAge: 10 * 60 * 1000,
-  rateLimit: true,
-  jwksRequestsPerMinute: 10,
-});
-
-// Database connection pool
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-});
-
-// Middleware
-const corsOrigins = (process.env.CORS_ORIGIN || (isProduction ? '' : 'http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173'))
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-if (isProduction && corsOrigins.length === 0) {
-  throw new Error('CORS_ORIGIN must be set in production');
-}
-
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    if (!corsOrigins.includes(origin)) {
-      return res.sendStatus(403);
-    }
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Vary', 'Origin');
-  }
-  res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
-app.use(bodyParser.json({ limit: '16kb' }));
-
-// Store the process start time
-const startTime = Date.now();
-
-function getSigningKey(header, callback) {
-  jwks.getSigningKey(header.kid, (error, key) => {
-    if (error) return callback(error);
-    callback(null, key.getPublicKey());
-  });
-}
-
-function hasRequiredRole(decoded) {
-  if (!AUTH_REQUIRED_ROLE) return true;
-
-  if (AUTH_ROLE_SOURCE === 'realm') {
-    return (decoded.realm_access?.roles || []).includes(AUTH_REQUIRED_ROLE);
-  }
-
-  if (AUTH_ROLE_SOURCE === 'client') {
-    return (decoded.resource_access?.[AUTH_CLIENT_ID]?.roles || []).includes(AUTH_REQUIRED_ROLE);
-  }
-
-  return false;
-}
-
-// Middleware to validate JWT bearer tokens and extract the stable user id from sub.
-function authenticateJwt(req, res, next) {
-  const authHeader = req.headers.authorization || '';
-  const [scheme, token] = authHeader.split(' ');
-
-  if (scheme !== 'Bearer' || !token) {
-    return res.status(401).json({ error: 'Bearer token is required' });
-  }
-
-  jwt.verify(
-    token,
-    getSigningKey,
-    {
-      algorithms: ['RS256'],
-      issuer: AUTH_ISSUER,
-      audience: AUTH_AUDIENCE,
-    },
-    (error, decoded) => {
-      if (error) {
-        return res.status(401).json({ error: 'Invalid or expired bearer token' });
+    if (config.corsOrigin === '*') {
+      res.header('Access-Control-Allow-Origin', '*');
+    } else if (origin) {
+      if (!config.corsOrigins.includes(origin)) {
+        return res.sendStatus(403);
       }
-
-      if (!hasRequiredRole(decoded)) {
-        return res.status(403).json({ error: `Required role '${AUTH_REQUIRED_ROLE}' is missing` });
-      }
-
-      req.auth = decoded;
-      req.userId = decoded.sub;
-      next();
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Vary', 'Origin');
     }
-  );
-}
 
-// Middleware to ensure authenticated user exists in database
-async function ensureUserExists(req, res, next) {
-  try {
-    await pool.query(
-      'INSERT INTO users (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
-      [req.userId]
-    );
+    res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
-  } catch (error) {
-    console.error('Error ensuring user exists:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  });
 }
 
-app.use('/todos', authenticateJwt, ensureUserExists);
+async function createApp() {
+  const app = express();
+  const startTime = Date.now();
 
-// ==================== AUTH DISCOVERY ENDPOINT ====================
-
-app.get('/auth/config', (req, res) => {
-  res.json({
-    issuer: PUBLIC_AUTH_ISSUER,
-    clientId: AUTH_CLIENT_ID,
-    audience: AUTH_AUDIENCE,
-    authorizationEndpoint: `${PUBLIC_AUTH_ISSUER}/protocol/openid-connect/auth`,
-    tokenEndpoint: `${PUBLIC_AUTH_ISSUER}/protocol/openid-connect/token`,
-    logoutEndpoint: `${PUBLIC_AUTH_ISSUER}/protocol/openid-connect/logout`,
-    pkceMethod: 'S256',
+  const verificationMetadata = await discoverOidcMetadata(config.auth.issuer, {
+    jwks_uri: config.auth.jwksUri,
   });
-});
-
-// ==================== METRICS ENDPOINTS ====================
-
-const protectMetrics = isProduction || process.env.METRICS_REQUIRE_AUTH === 'true';
-const metricsMiddleware = protectMetrics ? [authenticateJwt] : [];
-
-// /metrics endpoint that returns process uptime
-app.get('/metrics', ...metricsMiddleware, (req, res) => {
-  const uptime = (Date.now() - startTime) / 1000; // uptime in seconds
-  
-  res.json({
-    uptime: uptime,
-    uptime_seconds: Math.floor(uptime),
-    uptime_readable: formatUptime(uptime),
-    timestamp: new Date().toISOString(),
-    process: {
-      pid: process.pid,
-      memory: process.memoryUsage(),
-      cpu: process.cpuUsage()
-    }
+  const publicMetadata = await discoverOidcMetadata(config.auth.publicIssuer);
+  const authenticateJwt = createAuthenticateJwt({
+    authConfig: config.auth,
+    jwksUri: verificationMetadata.jwks_uri,
   });
-});
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
+  app.use(bodyParser.json({ limit: '16kb' }));
+  configureCors(app);
 
-// ==================== TODO ENDPOINTS ====================
+  app.use('/auth', createAuthRouter({ authConfig: config.auth, publicMetadata }));
+  app.use(createMetricsRouter({
+    startTime,
+    metricsMiddleware: config.protectMetrics ? [authenticateJwt] : [],
+  }));
+  app.use('/todos', createTodosRouter({ pool, authenticateJwt }));
 
-// GET /todos - List all todos for the user with optional filtering
-app.get('/todos', async (req, res) => {
-  try {
-    const { category, status, sort_by } = req.query;
-    let query = 'SELECT * FROM todos WHERE user_id = $1';
-    const params = [req.userId];
-    let paramCount = 1;
-
-    if (category) {
-      paramCount++;
-      query += ` AND category = $${paramCount}`;
-      params.push(category);
-    }
-
-    if (status) {
-      paramCount++;
-      query += ` AND status = $${paramCount}`;
-      params.push(status);
-    }
-
-    // Default sort by last_viewed (most recently viewed first)
-    const sortOption = sort_by || 'last_viewed_desc';
-    switch (sortOption) {
-      case 'created_asc':
-        query += ' ORDER BY created_at ASC';
-        break;
-      case 'created_desc':
-        query += ' ORDER BY created_at DESC';
-        break;
-      case 'updated_asc':
-        query += ' ORDER BY updated_at ASC';
-        break;
-      case 'updated_desc':
-        query += ' ORDER BY updated_at DESC';
-        break;
-      case 'last_viewed_asc':
-        query += ' ORDER BY last_viewed ASC';
-        break;
-      case 'last_viewed_desc':
-      default:
-        query += ' ORDER BY last_viewed DESC';
-    }
-
-    const result = await pool.query(query, params);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Error fetching todos:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// POST /todos - Create a new todo
-app.post('/todos', async (req, res) => {
-  try {
-    const { title, description, category, status, priority } = req.body;
-
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
-    }
-
-    const result = await pool.query(
-      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
-      [req.userId, title, description || null, category || null, status || 'pending', priority || 'medium']
-    );
-
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Error creating todo:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /todos/:id - Get a specific todo and update last_viewed
-app.get('/todos/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Update last_viewed timestamp
-    const result = await pool.query(
-      'UPDATE todos SET last_viewed = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
-      [id, req.userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Todo not found' });
-    }
-
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Error fetching todo:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// PUT /todos/:id - Update a todo
-app.put('/todos/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { title, description, category, status, priority } = req.body;
-
-    // First, check if todo exists and belongs to user
-    const checkResult = await pool.query(
-      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-      [id, req.userId]
-    );
-
-    if (checkResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Todo not found' });
-    }
-
-    const currentTodo = checkResult.rows[0];
-
-    // Update only provided fields
-    const updateFields = [];
-    const updateValues = [];
-    let paramCount = 1;
-
-    if (title !== undefined) {
-      updateFields.push(`title = $${paramCount++}`);
-      updateValues.push(title);
-    }
-    if (description !== undefined) {
-      updateFields.push(`description = $${paramCount++}`);
-      updateValues.push(description);
-    }
-    if (category !== undefined) {
-      updateFields.push(`category = $${paramCount++}`);
-      updateValues.push(category);
-    }
-    if (status !== undefined) {
-      updateFields.push(`status = $${paramCount++}`);
-      updateValues.push(status);
-    }
-    if (priority !== undefined) {
-      updateFields.push(`priority = $${paramCount++}`);
-      updateValues.push(priority);
-    }
-
-    if (updateFields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-
-    updateFields.push(`updated_at = NOW()`);
-    updateFields.push(`last_viewed = NOW()`);
-    updateValues.push(id, req.userId);
-
-    const query = `UPDATE todos SET ${updateFields.join(', ')} WHERE id = $${paramCount++} AND user_id = $${paramCount++} RETURNING *`;
-    const result = await pool.query(query, updateValues);
-
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Error updating todo:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// DELETE /todos/:id - Delete a todo
-app.delete('/todos/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const result = await pool.query(
-      'DELETE FROM todos WHERE id = $1 AND user_id = $2 RETURNING *',
-      [id, req.userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Todo not found' });
-    }
-
-    res.json({ message: 'Todo deleted successfully', deletedTodo: result.rows[0] });
-  } catch (error) {
-    console.error('Error deleting todo:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Helper function to format uptime in a readable way
-function formatUptime(seconds) {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  
-  const parts = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0) parts.push(`${minutes}m`);
-  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
-  
-  return parts.join(' ');
+  return app;
 }
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    pool.end(() => {
-      console.log('Database pool closed');
-      process.exit(0);
+async function start() {
+  const app = await createApp();
+  const server = app.listen(config.port, () => {
+    console.log(`Metrics & Todo server running on http://localhost:${config.port}`);
+    console.log(`Access metrics at http://localhost:${config.port}/metrics`);
+    console.log(`Access todos at http://localhost:${config.port}/todos (requires JWT bearer token)`);
+    console.log(`OIDC config at http://localhost:${config.port}/auth/config`);
+  });
+
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+      pool.end(() => {
+        console.log('Database pool closed');
+        process.exit(0);
+      });
     });
   });
-});
+}
 
-const server = app.listen(PORT, () => {
-  console.log(`Metrics & Todo server running on http://localhost:${PORT}`);
-  console.log(`Access metrics at http://localhost:${PORT}/metrics`);
-  console.log(`Access todos at http://localhost:${PORT}/todos (requires JWT bearer token)`);
-  console.log(`OIDC config at http://localhost:${PORT}/auth/config`);
+start().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });

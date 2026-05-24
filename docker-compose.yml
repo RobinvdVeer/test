@@ -6,14 +6,16 @@ services:
     image: postgres:16-alpine
     container_name: todo_postgres
     environment:
-      POSTGRES_USER: todouser
+      POSTGRES_USER: ${TODO_POSTGRES_USER:-todouser}
       POSTGRES_PASSWORD: ${TODO_POSTGRES_PASSWORD:?Set TODO_POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: tododb
+      POSTGRES_DB: ${TODO_POSTGRES_DB:-tododb}
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U todouser -d tododb"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,13 +24,15 @@ services:
     image: postgres:16-alpine
     container_name: keycloak_postgres
     environment:
-      POSTGRES_USER: keycloak
+      POSTGRES_USER: ${KEYCLOAK_POSTGRES_USER:-keycloak}
       POSTGRES_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD:?Set KEYCLOAK_POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: keycloak
+      POSTGRES_DB: ${KEYCLOAK_POSTGRES_DB:-keycloak}
+    ports:
+      - "5433:5432"
     volumes:
       - keycloak_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,18 +40,18 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:25.0
     container_name: todo_keycloak
-    command: start-dev --import-realm --hostname=http://localhost:8080
+    command: start-dev --import-realm --hostname=http://localhost:${KEYCLOAK_PORT:-8080}
     environment:
-      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
-      KC_DB_USERNAME: keycloak
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/${KEYCLOAK_POSTGRES_DB:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_POSTGRES_USER:-keycloak}
       KC_DB_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD:?Set KEYCLOAK_POSTGRES_PASSWORD in .env}
       KC_HTTP_ENABLED: "true"
       KC_HOSTNAME_STRICT: "false"
     ports:
-      - "8080:8080"
+      - "${KEYCLOAK_PORT:-8080}:8080"
     depends_on:
       keycloak-postgres:
         condition: service_healthy
@@ -60,15 +64,16 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://todouser:${TODO_POSTGRES_PASSWORD:?Set TODO_POSTGRES_PASSWORD in .env}@postgres:5432/tododb
+      DATABASE_URL: ${TODO_DATABASE_URL:?Set TODO_DATABASE_URL in .env}
       NODE_ENV: development
-      AUTH_ISSUER: http://localhost:8080/realms/local-dev
-      PUBLIC_AUTH_ISSUER: http://localhost:8080/realms/local-dev
-      AUTH_JWKS_URI: http://keycloak:8080/realms/local-dev/protocol/openid-connect/certs
-      AUTH_CLIENT_ID: todo-app
-      AUTH_AUDIENCE: todo-app
-      AUTH_REQUIRED_ROLE: user
-      AUTH_ROLE_SOURCE: realm
+      AUTH_ISSUER: ${AUTH_ISSUER:-http://localhost:8080/realms/local-dev}
+      PUBLIC_AUTH_ISSUER: ${PUBLIC_AUTH_ISSUER:-http://localhost:8080/realms/local-dev}
+      AUTH_JWKS_URI: ${AUTH_JWKS_URI:-http://keycloak:8080/realms/local-dev/protocol/openid-connect/certs}
+      AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-todo-app}
+      AUTH_AUDIENCE: ${AUTH_AUDIENCE:-todo-app}
+      AUTH_REQUIRED_ROLE: ${AUTH_REQUIRED_ROLE:-user}
+      AUTH_ROLES_CLAIM: ${AUTH_ROLES_CLAIM:-realm_access.roles}
+      AUTH_CLIENT_ROLES_CLAIM: ${AUTH_CLIENT_ROLES_CLAIM:-resource_access.todo-app.roles}
     depends_on:
       postgres:
         condition: service_healthy

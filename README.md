@@ -25,7 +25,7 @@ docker-compose up --build
 
 The app will be available at `http://localhost:3000`; Keycloak will be available at `http://localhost:8080`.
 
-Local Keycloak defaults: realm `local-dev`, public client `todo-app`. Use the authorization-code + PKCE flow to sign in.
+Local Keycloak defaults: realm `local-dev`, public client `todo-app`, users `alice` / `alicepass` and `bob` / `bobpass`. Use the authorization-code + PKCE flow to sign in. Keep `.env` auth values aligned with `keycloak/realm-export.json` if you change the local realm, client, role, or port.
 
 ### Local Development
 ```bash
