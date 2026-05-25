@@ -35,6 +35,21 @@ secrets:
   databaseUrl: ""
   postgresPassword: ""
 
+externalSecrets:
+  enabled: false
+  refreshInterval: 1h
+  secretStoreRef:
+    name: cluster-secret-store
+    kind: ClusterSecretStore
+  database:
+    remoteRef:
+      key: metrics-server/database
+      property: database-url
+  postgresPassword:
+    remoteRef:
+      key: metrics-server/postgres
+      property: postgres-password
+
 postgres:
   enabled: true
   auth:

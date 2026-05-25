@@ -5,9 +5,14 @@ const openApiDocument = require('./openapi.json');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL environment variable is required');
+  process.exit(1);
+}
+
 // Database connection pool
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://todouser:todopass@localhost:5432/tododb',
+  connectionString: process.env.DATABASE_URL,
 });
 
 // Middleware
