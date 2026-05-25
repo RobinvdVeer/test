@@ -40,6 +40,10 @@ test('openapi.json is a valid OpenAPI 3 document for implemented routes', async 
   expect(Object.keys(openApiDocument.paths)).toEqual(expect.arrayContaining([
     '/openapi.json',
     '/api/docs/openapi.json',
+    '/auth-config.json',
+    '/',
+    '/login',
+    '/auth/callback',
     '/health',
     '/metrics',
     '/todos',

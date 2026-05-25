@@ -1,82 +1,24 @@
-const STORAGE_KEY = 'todo-auth';
-const PKCE_VERIFIER_KEY = 'todo-pkce-verifier';
-const PKCE_STATE_KEY = 'todo-pkce-state';
-const RETURN_TO_KEY = 'todo-return-to';
+import { loadAuthConfig } from './auth-config.js';
+import { generatePkcePair, createState } from './pkce.js';
+import {
+  clearPkceState,
+  clearPkceVerifier,
+  clearReturnTo,
+  clearStoredAuth,
+  getStoredAuth,
+  isTokenValid,
+  setPkceState,
+  setPkceVerifier,
+  setReturnTo,
+} from './storage.js';
+import { completeLoginFromCallback } from './token-exchange.js';
 
-export async function loadAuthConfig() {
-  const response = await fetch('/auth-config.json', { headers: { accept: 'application/json' } });
-  if (!response.ok) {
-    throw new Error(`Unable to load auth config (${response.status})`);
-  }
-  return response.json();
-}
-
-export function getStoredAuth() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  return raw ? JSON.parse(raw) : null;
-}
-
-export function setStoredAuth(auth) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
-}
-
-export function clearStoredAuth() {
-  localStorage.removeItem(STORAGE_KEY);
-}
-
-export function getReturnTo(defaultValue = '/') {
-  return sessionStorage.getItem(RETURN_TO_KEY) || defaultValue;
-}
-
-export function setReturnTo(returnTo) {
-  sessionStorage.setItem(RETURN_TO_KEY, returnTo);
-}
-
-export function clearReturnTo() {
-  sessionStorage.removeItem(RETURN_TO_KEY);
-}
-
-export function getPkceVerifier() {
-  return sessionStorage.getItem(PKCE_VERIFIER_KEY);
-}
-
-export function setPkceVerifier(verifier) {
-  sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
-}
-
-export function clearPkceVerifier() {
-  sessionStorage.removeItem(PKCE_VERIFIER_KEY);
-}
-
-export function getPkceState() {
-  return sessionStorage.getItem(PKCE_STATE_KEY);
-}
-
-export function setPkceState(state) {
-  sessionStorage.setItem(PKCE_STATE_KEY, state);
-}
-
-export function clearPkceState() {
-  sessionStorage.removeItem(PKCE_STATE_KEY);
-}
-
-export function isTokenValid(auth) {
-  if (!auth?.access_token || !auth?.expires_at) return false;
-  return Date.now() < auth.expires_at - 15_000;
-}
-
-export async function generatePkcePair() {
-  const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
-  const verifier = base64UrlEncode(verifierBytes);
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-  const challenge = base64UrlEncode(new Uint8Array(digest));
-  return { verifier, challenge };
-}
+export { completeLoginFromCallback, getStoredAuth, isTokenValid, clearStoredAuth };
 
 export async function startLogin(returnTo = '/') {
   const config = await loadAuthConfig();
   const { verifier, challenge } = await generatePkcePair();
-  const state = base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)));
+  const state = createState();
 
   setPkceVerifier(verifier);
   setPkceState(state);
@@ -94,64 +36,11 @@ export async function startLogin(returnTo = '/') {
   window.location.assign(url.toString());
 }
 
-export async function completeLoginFromCallback() {
-  const config = await loadAuthConfig();
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  const returnedState = params.get('state');
-  const storedState = getPkceState();
-  const verifier = getPkceVerifier();
-
-  if (!code) throw new Error('Missing authorization code');
-  if (!returnedState || returnedState !== storedState) throw new Error('Invalid state');
-  if (!verifier) throw new Error('Missing PKCE verifier');
-
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    client_id: config.clientId,
-    code,
-    redirect_uri: config.redirectUri,
-    code_verifier: verifier,
-  });
-
-  const response = await fetch(config.tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Token exchange failed (${response.status})`);
-  }
-
-  const token = await response.json();
-  const expiresIn = Number(token.expires_in || 0);
-  setStoredAuth({
-    ...token,
-    expires_at: Date.now() + expiresIn * 1000,
-  });
-
-  const returnTo = getReturnTo('/');
-  clearPkceVerifier();
-  clearPkceState();
-  clearReturnTo();
-
-  return returnTo;
-}
-
 export function logout() {
   const auth = getStoredAuth();
   clearStoredAuth();
   clearReturnTo();
   clearPkceVerifier();
   clearPkceState();
-
   return auth;
-}
-
-function base64UrlEncode(value) {
-  const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }

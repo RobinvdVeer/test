@@ -123,6 +123,51 @@
         }
       }
     },
+    "/auth-config.json": {
+      "get": {
+        "summary": "Auth configuration",
+        "responses": {
+          "200": {
+            "description": "OIDC client configuration",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "App entrypoint",
+        "responses": {
+          "200": {
+            "description": "Todo app UI"
+          }
+        }
+      }
+    },
+    "/login": {
+      "get": {
+        "summary": "Login page",
+        "responses": {
+          "200": {
+            "description": "Login UI"
+          }
+        }
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "summary": "OIDC callback page",
+        "responses": {
+          "200": {
+            "description": "OIDC callback UI"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health check",
