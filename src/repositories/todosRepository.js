@@ -67,7 +67,28 @@ async function listTodos(userId, { category, status, sort_by, limit, offset }) {
   return result.rows;
 }
 
+const VALID_STATUSES = new Set(['pending', 'in_progress', 'completed']);
+const VALID_PRIORITIES = new Set(['low', 'medium', 'high']);
+
+function validateStatusPriority({ status, priority }) {
+  const err = new Error('Status must be one of: pending, in_progress, completed');
+  err.code = 'INVALID_STATUS_PRIORITY';
+
+  if (status !== undefined && status !== null && !VALID_STATUSES.has(status)) {
+    throw err;
+  }
+
+  if (priority !== undefined && priority !== null && !VALID_PRIORITIES.has(priority)) {
+    throw err;
+  }
+}
+
 async function createTodo(userId, { title, description, category, status, priority }) {
+  const statusToUse = status || 'pending';
+  const priorityToUse = priority || 'medium';
+
+  validateStatusPriority({ status: statusToUse, priority: priorityToUse });
+
   const result = await pool.query(
     'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
     [
@@ -75,8 +96,8 @@ async function createTodo(userId, { title, description, category, status, priori
       title,
       description || null,
       category || null,
-      status || 'pending',
-      priority || 'medium',
+      statusToUse,
+      priorityToUse,
     ]
   );
 
@@ -93,6 +114,8 @@ async function getTodoAndUpdateLastViewed(userId, id) {
 }
 
 async function updateTodo(userId, id, { title, description, category, status, priority }) {
+  validateStatusPriority({ status, priority });
+
   // First, check if todo exists and belongs to user
   const checkResult = await pool.query(
     'SELECT * FROM todos WHERE id = $1 AND user_id = $2',

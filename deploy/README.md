@@ -42,8 +42,7 @@ kubectl create secret generic metrics-server-postgres \
 kubectl create secret generic metrics-server-database \
   --from-literal=database-url='postgresql://todouser:REPLACE_ME@metrics-server-postgres:5432/tododb'
 
-kubectl create secret generic metrics-server-jwt \
-  --from-literal=jwt-secret='REPLACE_ME'
+
 ```
 
 Then install/upgrade (credentials are referenced by name/keys in values):
@@ -54,4 +53,4 @@ helm upgrade --install metrics-server ./deploy/chart \
   --set image.app.tag=<tag>
 ```
 
-Alternatively, set `app.database.secretName`, `postgres.auth.passwordSecretName`, and `app.jwt.secretName` to match your pre-created secrets.
+Alternatively, set `app.database.secretName` and `postgres.auth.passwordSecretName` to match your pre-created secrets.

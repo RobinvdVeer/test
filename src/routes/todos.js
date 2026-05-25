@@ -48,6 +48,9 @@ function registerTodosRoutes() {
       res.status(201).json(result);
     } catch (error) {
       console.error('Error creating todo:', error);
+      if (error && error.code === 'INVALID_STATUS_PRIORITY') {
+        return res.status(400).json({ error: error.message });
+      }
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -94,6 +97,9 @@ function registerTodosRoutes() {
       res.json(result);
     } catch (error) {
       console.error('Error updating todo:', error);
+      if (error && error.code === 'INVALID_STATUS_PRIORITY') {
+        return res.status(400).json({ error: error.message });
+      }
       res.status(500).json({ error: 'Internal server error' });
     }
   });

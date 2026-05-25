@@ -53,7 +53,7 @@ curl -X POST http://localhost:3000/todos \
 curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work"
 
 # Check metrics
-curl http://localhost:3000/metrics
+curl -H "X-User-Id: user123" http://localhost:3000/metrics
 
 # Fetch OpenAPI document for Kong/gateway registration
 curl http://localhost:3000/openapi.json
