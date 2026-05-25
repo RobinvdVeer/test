@@ -10,6 +10,7 @@ ingress:
 
 externalSecrets:
   enabled: true
+  apiVersion: external-secrets.io/v1alpha1
   secretStoreRef:
     name: cluster-secret-store
     kind: ClusterSecretStore
