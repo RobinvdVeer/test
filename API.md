@@ -27,6 +27,12 @@ npm start
 ## Authentication
 Todo and metrics requests require an `Authorization: Bearer <token>` header. Public endpoints (`/health`, `/openapi.json`, and `/api/docs/openapi.json`) do not require it.
 
+### Getting a Token
+1. Open `http://localhost:3000/login`.
+2. Sign up or sign in with Keycloak (self-service registration is enabled).
+3. The app completes a PKCE authorization-code flow and stores the access token in the browser.
+4. Copy the access token and use it as `Authorization: Bearer $ACCESS_TOKEN` for curl or other clients.
+
 ## API Endpoints
 
 ### Health Check
@@ -155,7 +161,7 @@ Response: `200 OK` with deleted todo details.
 
 ### Users Table
 - `id` - Auto-incremented primary key
-- `user_id` - Unique user identifier from X-User-Id header
+- `user_id` - Unique user identifier from Keycloak `sub` claim
 - `created_at` - Account creation timestamp
 
 ### Todos Table
@@ -178,20 +184,20 @@ The `last_viewed` field tracks the last time a user viewed or interacted with a 
 
 Example query to find forgotten items:
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```
 
 This returns pending todos sorted by least recently viewed first.
 
 ## Error Responses
 
-### Missing X-User-Id Header
+### Missing Authorization Header
 ```json
 {
-  "error": "X-User-Id header is required"
+  "error": "Authorization bearer token is required"
 }
 ```
-Status: `400 Bad Request`
+Status: `401 Unauthorized`
 
 ### Todo Not Found
 ```json
@@ -230,7 +236,7 @@ Status: `500 Internal Server Error`
 ### Create a todo
 ```bash
 curl -X POST http://localhost:3000/todos \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Design database schema",
@@ -242,18 +248,18 @@ curl -X POST http://localhost:3000/todos \
 
 ### List all pending todos in work category
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work&status=pending"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?category=work&status=pending"
 ```
 
 ### Mark a todo as completed
 ```bash
 curl -X PUT http://localhost:3000/todos/1 \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}'
 ```
 
 ### Find forgotten todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```
