@@ -15,19 +15,15 @@ if (require.main === module) {
     process.exit(1);
   }
 
-  // Import DB pool only when the server is actually starting.
   ({ pool } = require('./src/db/pool'));
 
   server = app.listen(PORT, () => {
-    console.log(`Metrics & Todo server running on http://localhost:${PORT}`);
-    console.log(`Access openapi at http://localhost:${PORT}/openapi.json`);
-    console.log(
-      `Access metrics at http://localhost:${PORT}/metrics (requires X-User-Id header)`
-    );
-    console.log('Access todos at /todos (requires X-User-Id header)');
+    console.log(`Todo app running on http://localhost:${PORT}`);
+    console.log(`Login page at http://localhost:${PORT}/login`);
+    console.log(`OpenAPI at http://localhost:${PORT}/openapi.json`);
+    console.log(`Todos require a Bearer JWT from Keycloak`);
   });
 
-  // Graceful shutdown
   process.on('SIGTERM', () => {
     console.log('SIGTERM signal received: closing HTTP server');
     if (!server) return;

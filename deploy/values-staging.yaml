@@ -21,3 +21,11 @@ externalSecrets:
     remoteRef:
       key: metrics-server/staging/postgres
       property: postgres-password
+  keycloakPostgresPassword:
+    remoteRef:
+      key: metrics-server/staging/keycloak-postgres
+      property: postgres-password
+  keycloakAdminPassword:
+    remoteRef:
+      key: metrics-server/staging/keycloak
+      property: admin-password

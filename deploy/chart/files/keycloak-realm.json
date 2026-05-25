@@ -1,0 +1,44 @@
+{
+  "realm": "{{ .Values.keycloak.realm }}",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "{{ .Values.keycloak.clientId }}",
+      "name": "Todo App",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["{{ .Values.app.publicUrl }}/auth/callback"],
+      "webOrigins": ["{{ .Values.app.publicUrl }}"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

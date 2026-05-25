@@ -1,0 +1,210 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-keycloak-realm
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak
+binaryData: {}
+data:
+  realm.json: |-
+{{ tpl (.Files.Get "files/keycloak-realm.json") . | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-keycloak-postgres
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: keycloak-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Chart.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: keycloak-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.image.postgres.repository }}:{{ .Values.image.postgres.tag }}"
+          imagePullPolicy: {{ .Values.image.postgres.pullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.keycloak.database.username | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.keycloak.database.database | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.database.passwordSecretName }}
+                  key: {{ .Values.keycloak.database.passwordSecretKey }}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.keycloak.database.username | quote }}, "-d", {{ .Values.keycloak.database.database | quote }}]
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.keycloak.database.username | quote }}, "-d", {{ .Values.keycloak.database.database | quote }}]
+      volumes:
+        - name: data
+          {{- if .Values.keycloak.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-keycloak-postgres
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-keycloak-postgres
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak-postgres
+spec:
+  type: {{ .Values.service.keycloakPostgres.type }}
+  ports:
+    - port: {{ .Values.service.keycloakPostgres.port }}
+      targetPort: postgres
+      protocol: TCP
+      name: postgres
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak-postgres
+{{- if .Values.keycloak.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-keycloak-postgres
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak-postgres
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- if .Values.keycloak.persistence.storageClassName }}
+  storageClassName: {{ .Values.keycloak.persistence.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.keycloak.persistence.size }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-keycloak
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: keycloak
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Chart.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: "{{ .Values.image.keycloak.repository }}:{{ .Values.image.keycloak.tag }}"
+          imagePullPolicy: {{ .Values.image.keycloak.pullPolicy }}
+          command: ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: KEYCLOAK_ADMIN
+              value: {{ .Values.keycloak.auth.username | quote }}
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.auth.passwordSecretName }}
+                  key: {{ .Values.keycloak.auth.passwordSecretKey }}
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: {{ printf "jdbc:postgresql://%s-keycloak-postgres:%d/%s" .Release.Name .Values.service.keycloakPostgres.port .Values.keycloak.database.database | quote }}
+            - name: KC_DB_USERNAME
+              value: {{ .Values.keycloak.database.username | quote }}
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.database.passwordSecretName }}
+                  key: {{ .Values.keycloak.database.passwordSecretKey }}
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HTTP_PORT
+              value: "8080"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HOSTNAME
+              value: {{ .Values.keycloak.hostname | quote }}
+            - name: KC_HOSTNAME_PORT
+              value: {{ .Values.service.keycloak.port | quote }}
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import/realm.json
+              subPath: realm.json
+          readinessProbe:
+            httpGet:
+              path: /realms/{{ .Values.keycloak.realm }}/.well-known/openid-configuration
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /realms/{{ .Values.keycloak.realm }}/.well-known/openid-configuration
+              port: http
+      volumes:
+        - name: realm
+          configMap:
+            name: {{ .Release.Name }}-keycloak-realm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-keycloak
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak
+spec:
+  type: {{ .Values.service.keycloak.type }}
+  ports:
+    - port: {{ .Values.service.keycloak.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak
+{{- end }}

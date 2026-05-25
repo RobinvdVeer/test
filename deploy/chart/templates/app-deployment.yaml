@@ -43,7 +43,24 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.app.database.secretName }}
                   key: {{ .Values.app.database.secretKey }}
-
+            - name: KEYCLOAK_ISSUER_URL
+              value: {{ .Values.app.auth.issuerUrl | quote }}
+            - name: KEYCLOAK_JWKS_URL
+              value: {{ printf "http://%s-keycloak:%d/realms/%s/protocol/openid-connect/certs" .Release.Name .Values.service.keycloak.port .Values.keycloak.realm | quote }}
+            - name: KEYCLOAK_AUTHORIZE_URL
+              value: {{ .Values.app.auth.authorizeUrl | quote }}
+            - name: KEYCLOAK_TOKEN_URL
+              value: {{ .Values.app.auth.tokenUrl | quote }}
+            - name: KEYCLOAK_LOGOUT_URL
+              value: {{ .Values.app.auth.logoutUrl | quote }}
+            - name: KEYCLOAK_CLIENT_ID
+              value: {{ .Values.app.auth.clientId | quote }}
+            - name: AUTH_REDIRECT_URI
+              value: {{ .Values.app.auth.redirectUri | quote }}
+            - name: AUTH_POST_LOGOUT_REDIRECT_URI
+              value: {{ .Values.app.auth.postLogoutRedirectUri | quote }}
+            - name: AUTH_SCOPE
+              value: {{ .Values.app.auth.scope | quote }}
           readinessProbe:
             httpGet:
               path: /health

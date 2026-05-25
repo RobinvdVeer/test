@@ -9,6 +9,10 @@ image:
     repository: postgres
     tag: 16-alpine
     pullPolicy: IfNotPresent
+  keycloak:
+    repository: quay.io/keycloak/keycloak
+    tag: 25.0.6
+    pullPolicy: IfNotPresent
 
 service:
   app:
@@ -18,22 +22,36 @@ service:
   postgres:
     type: ClusterIP
     port: 5432
+  keycloak:
+    type: ClusterIP
+    port: 8080
+  keycloakPostgres:
+    type: ClusterIP
+    port: 5432
 
 app:
   port: 3000
   nodeEnv: production
+  publicUrl: http://localhost:3000
   database:
     secretName: metrics-server-database
     secretKey: database-url
+  auth:
+    clientId: todo-app
+    issuerUrl: http://localhost:8081/realms/todos
+    authorizeUrl: http://localhost:8081/realms/todos/protocol/openid-connect/auth
+    tokenUrl: http://localhost:8081/realms/todos/protocol/openid-connect/token
+    logoutUrl: http://localhost:8081/realms/todos/protocol/openid-connect/logout
+    redirectUri: http://localhost:3000/auth/callback
+    postLogoutRedirectUri: http://localhost:3000/login
+    scope: openid profile email
 
-# Optional chart-created secrets. Leave values empty in git; inject with
-# --set-string secrets.databaseUrl=$DATABASE_URL and
-# --set-string secrets.postgresPassword=$POSTGRES_PASSWORD, or provide your own
-# Kubernetes/External/Sealed Secret with the names above.
 secrets:
   create: false
   databaseUrl: ""
   postgresPassword: ""
+  keycloakPostgresPassword: ""
+  keycloakAdminPassword: ""
 
 externalSecrets:
   enabled: false
@@ -50,6 +68,14 @@ externalSecrets:
     remoteRef:
       key: metrics-server/postgres
       property: postgres-password
+  keycloakPostgresPassword:
+    remoteRef:
+      key: metrics-server/keycloak-postgres
+      property: postgres-password
+  keycloakAdminPassword:
+    remoteRef:
+      key: metrics-server/keycloak
+      property: admin-password
 
 postgres:
   enabled: true
@@ -57,6 +83,26 @@ postgres:
     username: todouser
     database: tododb
     passwordSecretName: metrics-server-postgres
+    passwordSecretKey: postgres-password
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClassName: ""
+
+keycloak:
+  enabled: true
+  realm: todos
+  clientId: todo-app
+  publicUrl: http://localhost:8081
+  hostname: localhost
+  auth:
+    username: admin
+    passwordSecretName: metrics-server-keycloak
+    passwordSecretKey: admin-password
+  database:
+    username: keycloak
+    database: keycloak
+    passwordSecretName: metrics-server-keycloak
     passwordSecretKey: postgres-password
   persistence:
     enabled: true
