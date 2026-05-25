@@ -55,7 +55,7 @@ secrets:
 
 externalSecrets:
   enabled: false
-  apiVersion: external-secrets.io/v1beta1
+  apiVersion: external-secrets.io/v1
   refreshInterval: 1h
   secretStoreRef:
     name: cluster-secret-store
