@@ -56,12 +56,21 @@ spec:
               mountPath: /var/lib/postgresql/data
             - name: init
               mountPath: /docker-entrypoint-initdb.d
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.postgres.auth.username | quote }}, "-d", {{ .Values.postgres.auth.database | quote }}]
+            failureThreshold: 60
+            periodSeconds: 5
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", {{ .Values.postgres.auth.username | quote }}, "-d", {{ .Values.postgres.auth.database | quote }}]
+            periodSeconds: 10
+            failureThreshold: 6
           livenessProbe:
             exec:
               command: ["pg_isready", "-U", {{ .Values.postgres.auth.username | quote }}, "-d", {{ .Values.postgres.auth.database | quote }}]
+            periodSeconds: 10
+            failureThreshold: 6
       volumes:
         - name: init
           configMap:

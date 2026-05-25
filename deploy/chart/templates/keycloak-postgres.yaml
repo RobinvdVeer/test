@@ -42,12 +42,21 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.keycloak.database.username | quote }}, "-d", {{ .Values.keycloak.database.database | quote }}]
+            failureThreshold: 60
+            periodSeconds: 5
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", {{ .Values.keycloak.database.username | quote }}, "-d", {{ .Values.keycloak.database.database | quote }}]
+            periodSeconds: 10
+            failureThreshold: 6
           livenessProbe:
             exec:
               command: ["pg_isready", "-U", {{ .Values.keycloak.database.username | quote }}, "-d", {{ .Values.keycloak.database.database | quote }}]
+            periodSeconds: 10
+            failureThreshold: 6
       volumes:
         - name: data
           {{- if .Values.keycloak.persistence.enabled }}

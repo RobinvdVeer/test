@@ -67,14 +67,24 @@ spec:
             - name: realm
               mountPath: /opt/keycloak/data/import/realm.json
               subPath: realm.json
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            failureThreshold: 60
+            periodSeconds: 5
           readinessProbe:
             httpGet:
               path: /realms/{{ .Values.keycloak.realm }}/.well-known/openid-configuration
               port: http
+            periodSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
-              path: /realms/{{ .Values.keycloak.realm }}/.well-known/openid-configuration
+              path: /health/live
               port: http
+            periodSeconds: 10
+            failureThreshold: 6
       volumes:
         - name: realm
           configMap:
