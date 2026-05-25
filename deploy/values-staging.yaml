@@ -1,0 +1,9 @@
+image:
+  app:
+    repository: ghcr.io/robinvdveer/metrics-server
+    tag: latest
+
+replicaCount: 1
+
+ingress:
+  enabled: false

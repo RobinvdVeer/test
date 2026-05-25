@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { Pool } = require('pg');
+const openApiDocument = require('./openapi.json');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -14,6 +15,20 @@ app.use(bodyParser.json());
 
 // Store the process start time
 const startTime = Date.now();
+
+// Public endpoints used by gateways, health probes, and API discovery.
+app.get('/openapi.json', (req, res) => {
+  res.json(openApiDocument);
+});
+
+app.get('/api/docs/openapi.json', (req, res) => {
+  res.json(openApiDocument);
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 // Middleware to extract and validate user from header
 app.use((req, res, next) => {
@@ -56,11 +71,6 @@ app.get('/metrics', (req, res) => {
       cpu: process.cpuUsage()
     }
   });
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
 });
 
 // ==================== TODO ENDPOINTS ====================

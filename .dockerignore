@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+Dockerfile
+.dockerignore
+deploy
+*.md
+FINAL_SUMMARY.txt
+IMPLEMENTATION_SUMMARY.md
+START_HERE.md
+VALIDATION.md
