@@ -18,6 +18,17 @@ function base64UrlDecodeJson(segment) {
   return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
 }
 
+function base64UrlDecodeBuffer(segment) {
+  const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+  const buffer = Buffer.from(padded, 'base64');
+  const canonical = base64UrlEncode(buffer);
+  if (canonical !== segment) {
+    throw new Error('Invalid token signature');
+  }
+  return buffer;
+}
+
 async function fetchJwks(jwksUrl) {
   const cached = jwksCache.get(jwksUrl);
   const now = Date.now();
@@ -64,10 +75,7 @@ function verifySignature(token, jwk) {
   verifier.end();
 
   const publicKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
-  return verifier.verify(
-    publicKey,
-    Buffer.from(encodedSignature.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
-  );
+  return verifier.verify(publicKey, base64UrlDecodeBuffer(encodedSignature));
 }
 
 async function verifyJwt(token, { issuer, jwksUrl, clientId }) {
