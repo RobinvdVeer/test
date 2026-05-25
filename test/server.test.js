@@ -129,6 +129,49 @@ describe('public discovery and health endpoints', () => {
     expect(queryMock).not.toHaveBeenCalled();
   });
 
+  test('serves /auth-config.json with Keycloak settings', async () => {
+    const app = loadApp();
+
+    const res = await request(app).get('/auth-config.json').expect(200);
+
+    expect(res.body).toEqual({
+      issuerUrl: 'https://keycloak.local/realms/todos',
+      clientId: 'todo-app',
+      authorizeUrl:
+        'https://keycloak.local/realms/todos/protocol/openid-connect/auth',
+      tokenUrl:
+        'https://keycloak.local/realms/todos/protocol/openid-connect/token',
+      logoutUrl:
+        'https://keycloak.local/realms/todos/protocol/openid-connect/logout',
+      redirectUri: 'http://localhost:3000/auth/callback',
+      postLogoutRedirectUri: 'http://localhost:3000/login',
+      scope: 'openid profile email',
+    });
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('serves the login page', async () => {
+    const app = loadApp();
+
+    const res = await request(app).get('/login').expect(200);
+
+    expect(res.type).toMatch(/html/);
+    expect(res.text).toContain('<button id="login">Login</button>');
+    expect(res.text).toContain('/assets/login.js');
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('serves the auth callback page', async () => {
+    const app = loadApp();
+
+    const res = await request(app).get('/auth/callback').expect(200);
+
+    expect(res.type).toMatch(/html/);
+    expect(res.text).toContain('Signing in…');
+    expect(res.text).toContain('/assets/callback.js');
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
   test('serves /metrics without auth', async () => {
     const app = loadApp();
 
@@ -175,6 +218,17 @@ describe('protected middleware', () => {
     await request(app)
       .delete('/todos/7')
       .expect(401, { error: 'Authorization bearer token is required' });
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects invalid bearer tokens before querying database', async () => {
+    const app = loadApp();
+
+    await request(app)
+      .get('/todos')
+      .set({ Authorization: 'Bearer abc.def.ghi' })
+      .expect(401, { error: 'Invalid bearer token' });
 
     expect(queryMock).not.toHaveBeenCalled();
   });
