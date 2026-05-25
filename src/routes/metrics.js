@@ -33,11 +33,6 @@ function registerMetricsRoutes(app, startTime) {
       uptime_seconds: Math.floor(uptime),
       uptime_readable: formatUptime(uptime),
       timestamp: new Date(nowMs).toISOString(),
-      process: {
-        pid: process.pid,
-        memory: process.memoryUsage(),
-        cpu: process.cpuUsage(),
-      },
     };
 
     cachedPayload = payload;

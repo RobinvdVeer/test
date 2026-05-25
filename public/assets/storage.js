@@ -4,16 +4,16 @@ const PKCE_STATE_KEY = 'todo-pkce-state';
 const RETURN_TO_KEY = 'todo-return-to';
 
 export function getStoredAuth() {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = sessionStorage.getItem(STORAGE_KEY);
   return raw ? JSON.parse(raw) : null;
 }
 
 export function setStoredAuth(auth) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
 }
 
 export function clearStoredAuth() {
-  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
 }
 
 export function getReturnTo(defaultValue = '/') {
