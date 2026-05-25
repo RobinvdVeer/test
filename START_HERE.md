@@ -1,6 +1,6 @@
-# Todo App Backend - Start Here 📚
+# Metrics Todo API - Start Here 📚
 
-Welcome! This is a complete, production-ready todo app backend implementation. Here's where to begin based on what you need:
+Welcome! This is a complete, production-ready todo and metrics API implementation. Here's where to begin based on what you need:
 
 ## 🚀 Just Want to Run It?
 **→ Read [QUICKSTART.md](./QUICKSTART.md)**
@@ -70,6 +70,8 @@ Complete workflow examples in a single executable script.
 |------|---------|
 | `example-requests.sh` | Complete API workflow examples |
 | `.gitignore` | Git configuration |
+| `.env.example` | Docker Compose environment template |
+| `openapi.json` | OpenAPI 3 document for gateway registration |
 
 ---
 
@@ -77,6 +79,8 @@ Complete workflow examples in a single executable script.
 
 ### Start Everything
 ```bash
+cp .env.example .env
+# Edit .env and set POSTGRES_PASSWORD.
 docker-compose up --build
 ```
 
@@ -109,6 +113,7 @@ docker-compose down
 │      Node.js / Express Server (3000)            │
 │  ├─ /health (health check)                      │
 │  ├─ /metrics (uptime, CPU, memory)              │
+│  ├─ /openapi.json (OpenAPI document)            │
 │  ├─ GET /todos (list with filtering)            │
 │  ├─ POST /todos (create)                        │
 │  ├─ GET /todos/:id (get + update last_viewed)   │
@@ -212,7 +217,7 @@ docker-compose down
 
 1. **Run it locally** (5 minutes)
    - Read [QUICKSTART.md](./QUICKSTART.md)
-   - Run `docker-compose up --build`
+   - Copy `.env.example` to `.env`, set `POSTGRES_PASSWORD`, then run `docker-compose up --build`
    - Try `./example-requests.sh`
 
 2. **Explore the API** (15 minutes)
@@ -235,7 +240,7 @@ docker-compose down
 ## FAQ
 
 **Q: Do I need to modify anything before running?**
-A: No! Just run `docker-compose up --build` and it works.
+A: Copy `.env.example` to `.env`, set `POSTGRES_PASSWORD`, then run `docker-compose up --build`.
 
 **Q: How do I know the user ID?**
 A: You make it up! Any string works: `user123`, `john@example.com`, `user-abc-123`, etc.

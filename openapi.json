@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Metrics and Todo API",
+    "title": "Metrics Todo API",
     "version": "1.0.0",
     "description": "HTTP API for process metrics and user-scoped todo management. Todo endpoints require the X-User-Id header."
   },
@@ -27,8 +27,8 @@
           "title": { "type": "string" },
           "description": { "type": "string", "nullable": true },
           "category": { "type": "string", "nullable": true },
-          "status": { "type": "string", "default": "pending" },
-          "priority": { "type": "string", "default": "medium" },
+          "status": { "type": "string", "enum": ["pending", "in_progress", "completed"], "default": "pending" },
+          "priority": { "type": "string", "enum": ["low", "medium", "high"], "default": "medium" },
           "created_at": { "type": "string", "format": "date-time" },
           "updated_at": { "type": "string", "format": "date-time" },
           "last_viewed": { "type": "string", "format": "date-time" }
@@ -40,8 +40,8 @@
           "title": { "type": "string" },
           "description": { "type": "string", "nullable": true },
           "category": { "type": "string", "nullable": true },
-          "status": { "type": "string" },
-          "priority": { "type": "string" }
+          "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] },
+          "priority": { "type": "string", "enum": ["low", "medium", "high"] }
         }
       },
       "Error": {
@@ -77,8 +77,7 @@
     "/metrics": {
       "get": {
         "summary": "Process metrics",
-        "parameters": [ { "$ref": "#/components/parameters/UserIdHeader" } ],
-        "responses": { "200": { "description": "Runtime metrics" }, "400": { "$ref": "#/components/responses/BadRequest" } }
+        "responses": { "200": { "description": "Runtime metrics" } }
       }
     },
     "/todos": {
