@@ -46,11 +46,11 @@ spec:
             - name: APP_BASE_URL
               value: {{ .Values.app.baseUrl | quote }}
             - name: KEYCLOAK_ISSUER
-              value: {{ .Values.app.auth.issuer | quote }}
+              value: {{ printf "%s/realms/%s" (trimSuffix "/" .Values.keycloak.publicUrl) .Values.keycloak.realm | quote }}
             - name: KEYCLOAK_JWKS_URL
-              value: {{ .Values.app.auth.jwksUrl | quote }}
+              value: {{ printf "%s/realms/%s/protocol/openid-connect/certs" (trimSuffix "/" .Values.keycloak.publicUrl) .Values.keycloak.realm | quote }}
             - name: KEYCLOAK_CLIENT_ID
-              value: {{ .Values.app.auth.clientId | quote }}
+              value: {{ .Values.keycloak.client.id | quote }}
 
           readinessProbe:
             httpGet:

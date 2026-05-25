@@ -1,9 +1,14 @@
 const { createApp } = require('./src/app');
 const { getConfig } = require('./src/config');
+const { validateKeycloakConfig } = require('./src/auth/keycloak');
 
 const { PORT } = getConfig();
 
 let pool;
+
+if (process.env.NODE_ENV === 'production') {
+  validateKeycloakConfig();
+}
 
 const app = createApp();
 

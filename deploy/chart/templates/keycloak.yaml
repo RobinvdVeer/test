@@ -1,0 +1,143 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-keycloak-realm
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak
+data:
+  realm-import.json: |-
+    {
+      "realm": {{ .Values.keycloak.realm | quote }},
+      "enabled": true,
+      "registrationAllowed": {{ .Values.keycloak.realmConfig.registrationAllowed }},
+      "registrationEmailAsUsername": {{ .Values.keycloak.realmConfig.registrationEmailAsUsername }},
+      "loginWithEmailAllowed": {{ .Values.keycloak.realmConfig.loginWithEmailAllowed }},
+      "duplicateEmailsAllowed": {{ .Values.keycloak.realmConfig.duplicateEmailsAllowed }},
+      "resetPasswordAllowed": {{ .Values.keycloak.realmConfig.resetPasswordAllowed }},
+      "editUsernameAllowed": {{ .Values.keycloak.realmConfig.editUsernameAllowed }},
+      "rememberMe": {{ .Values.keycloak.realmConfig.rememberMe }},
+      "clients": [
+        {
+          "clientId": {{ .Values.keycloak.client.id | quote }},
+          "name": {{ .Values.keycloak.client.name | quote }},
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": false,
+          "frontchannelLogout": true,
+          "redirectUris": {{ toJson .Values.keycloak.client.redirectUris }},
+          "webOrigins": {{ toJson .Values.keycloak.client.webOrigins }},
+          "attributes": {
+            "pkce.code.challenge.method": "S256"
+          }
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-keycloak
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: keycloak
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Chart.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: "{{ .Values.image.keycloak.repository }}:{{ .Values.image.keycloak.tag }}"
+          imagePullPolicy: {{ .Values.image.keycloak.pullPolicy }}
+          command: ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: KEYCLOAK_ADMIN
+              value: {{ .Values.keycloak.admin.username | quote }}
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.auth.adminPasswordSecretName }}
+                  key: {{ .Values.keycloak.auth.adminPasswordSecretKey }}
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              value: {{ printf "%s-keycloak-postgres" .Release.Name | quote }}
+            - name: KC_DB_URL_PORT
+              value: "5432"
+            - name: KC_DB_URL_DATABASE
+              value: {{ .Values.keycloak.postgres.database | quote }}
+            - name: KC_DB_USERNAME
+              value: {{ .Values.keycloak.postgres.username | quote }}
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.postgres.passwordSecretName }}
+                  key: {{ .Values.keycloak.postgres.passwordSecretKey }}
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_HOSTNAME
+              value: {{ .Values.keycloak.publicUrl | quote }}
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import/realm-import.json
+              subPath: realm-import.json
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+      volumes:
+        - name: realm-import
+          configMap:
+            name: {{ .Release.Name }}-keycloak
+            items:
+              - key: realm-import.json
+                path: realm-import.json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-keycloak
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak
+spec:
+  type: {{ .Values.service.keycloak.type }}
+  ports:
+    - port: {{ .Values.service.keycloak.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keycloak
+{{- end }}
