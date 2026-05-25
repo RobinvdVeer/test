@@ -54,3 +54,31 @@ helm upgrade --install metrics-server ./deploy/chart \
 ```
 
 Alternatively, set `app.database.secretName` and `postgres.auth.passwordSecretName` to match your pre-created secrets.
+
+## Pod security context
+
+The app Deployment renders both a pod-level and a container-level
+`securityContext` from `.Values.securityContext`. Defaults are tuned for the
+`ghcr.io/robinvdveer/metrics-server` image, which is based on `node:18-alpine`
+and declares `USER node` (UID/GID 1000).
+
+| Key | Default | Applied at | Purpose |
+| --- | --- | --- | --- |
+| `securityContext.runAsNonRoot` | `true` | container | Refuse to start if the resolved UID is 0. |
+| `securityContext.runAsUser` | `1000` | container | Numeric UID the container runs as. |
+| `securityContext.runAsGroup` | `1000` | container | Numeric GID the container runs as. |
+| `securityContext.fsGroup` | `1000` | pod | Supplemental GID applied to mounted volumes. |
+| `securityContext.allowPrivilegeEscalation` | `false` | container | Prevents `setuid`/`setgid` based escalation. |
+
+Notes:
+
+- `runAsUser`, `runAsGroup`, and `fsGroup` MUST be numeric. When
+  `runAsNonRoot: true` is set and the image only declares a non-numeric user
+  (e.g. `USER node`), the kubelet cannot verify the UID is non-zero and will
+  fail the pod with `CreateContainerConfigError`.
+- The UID/GID you choose must correspond to a real non-root user baked into
+  the app image. If you rebuild the image on a different base, update these
+  values to match.
+- When overriding `securityContext:` in a per-env values file, you can set
+  any subset of keys — unspecified keys fall back to the defaults above.
+

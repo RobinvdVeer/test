@@ -126,11 +126,23 @@ ingress:
           pathType: Prefix
   tls: []
 
+# Pod and container securityContext for the app Deployment.
+# All keys are optional when overriding in a per-env values file; any key you
+# omit falls back to the default below. Values must be numeric where shown
+# (the kubelet cannot verify a non-numeric user against runAsNonRoot: true).
+# The defaults match the `node` user (UID/GID 1000) in node:18-alpine, which
+# is the base image of ghcr.io/robinvdveer/metrics-server. See deploy/README.md
+# for details.
 securityContext:
+  # runAsNonRoot (container): refuse to start if the resolved UID is 0.
   runAsNonRoot: true
+  # runAsUser (container): numeric UID the container runs as.
   runAsUser: 1000
+  # runAsGroup (container): numeric GID the container runs as.
   runAsGroup: 1000
+  # fsGroup (pod): supplemental GID applied to mounted volumes.
   fsGroup: 1000
+  # allowPrivilegeEscalation (container): blocks setuid/setgid escalation.
   allowPrivilegeEscalation: false
 
 resources: {}
