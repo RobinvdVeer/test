@@ -105,7 +105,7 @@ describe('helm chart deployability conventions', () => {
     expect(externalSecrets.length).toBeGreaterThanOrEqual(2);
 
     for (const es of externalSecrets) {
-      expect(es.apiVersion).toBe('external-secrets.io/v1alpha1');
+      expect(es.apiVersion).toBe('external-secrets.io/v1beta1');
     }
 
     const database = externalSecrets.find((es) => es.metadata.name === 'test-database');
