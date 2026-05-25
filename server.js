@@ -4,6 +4,11 @@ const { getConfig } = require('./src/config');
 
 const { PORT } = getConfig();
 
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL environment variable is required');
+  process.exit(1);
+}
+
 const app = createApp();
 
 let server;
