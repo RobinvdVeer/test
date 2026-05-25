@@ -70,6 +70,7 @@ describe('helm chart deployability conventions', () => {
     const keycloakService = docs.find((doc) => doc.kind === 'Service' && doc.metadata.name === 'test-keycloak');
     const keycloakSecret = docs.find((doc) => doc.kind === 'Secret' && doc.metadata.name === 'metrics-server-keycloak');
     const keycloakRealm = docs.find((doc) => doc.kind === 'ConfigMap' && doc.metadata.name === 'test-keycloak-realm');
+    const postgresInit = docs.find((doc) => doc.kind === 'ConfigMap' && doc.metadata.name === 'test-postgres-init');
 
     expect(appDeployment.spec.template.spec.containers[0].image).toBe('example.test/app:abc123');
     expect(appDeployment.spec.template.spec.containers[0].env).toEqual(expect.arrayContaining([
@@ -112,6 +113,9 @@ describe('helm chart deployability conventions', () => {
     expect(keycloakRealm.data['realm.json']).toContain('"clientId": "todo-app"');
     expect(keycloakRealm.data['realm.json']).toContain('http://localhost:3000/auth/callback');
     expect(keycloakRealm.data['realm.json']).toContain('http://localhost:3000');
+    expect(postgresInit.data['init.sql']).toContain('CREATE TABLE IF NOT EXISTS users');
+    expect(postgresInit.data['init.sql']).toContain('CREATE TABLE IF NOT EXISTS todos');
+    expect(postgresInit.data['init.sql']).toContain('CREATE INDEX IF NOT EXISTS idx_todos_user_id');
   });
 
   maybeTest('renders ExternalSecret resources when enabled (staging)', () => {
@@ -129,10 +133,70 @@ describe('helm chart deployability conventions', () => {
 
     const docs = yaml.loadAll(rendered).filter(Boolean);
     const externalSecrets = docs.filter((doc) => doc.kind === 'ExternalSecret');
+    const expectExternalSecret = (resourceName, targetName, data) => {
+      const resource = externalSecrets.find((doc) => doc.metadata.name === resourceName);
 
-    expect(externalSecrets.length).toBeGreaterThanOrEqual(3);
+      expect(resource).toBeDefined();
+      expect(resource.apiVersion).toBe('external-secrets.io/v1beta1');
+      expect(resource.spec.refreshInterval).toBe('1h');
+      expect(resource.spec.secretStoreRef).toEqual({
+        name: 'cluster-secret-store',
+        kind: 'ClusterSecretStore',
+      });
+      expect(resource.spec.target).toMatchObject({
+        name: targetName,
+        creationPolicy: 'Owner',
+      });
+      expect(resource.spec.data).toEqual(expect.arrayContaining(data));
+    };
+
+    expect(externalSecrets.length).toBe(3);
     expect(externalSecrets.map((doc) => doc.metadata.name)).toEqual(
       expect.arrayContaining(['test-database', 'test-postgres', 'test-keycloak'])
     );
+
+    expectExternalSecret('test-database', 'metrics-server-database', [
+      expect.objectContaining({
+        secretKey: 'database-url',
+        remoteRef: {
+          key: 'metrics-server/staging/database',
+          property: 'database-url',
+        },
+      }),
+    ]);
+
+    expectExternalSecret('test-postgres', 'metrics-server-postgres', [
+      expect.objectContaining({
+        secretKey: 'postgres-password',
+        remoteRef: {
+          key: 'metrics-server/staging/postgres',
+          property: 'postgres-password',
+        },
+      }),
+    ]);
+
+    expectExternalSecret('test-keycloak', 'metrics-server-keycloak', [
+      expect.objectContaining({
+        secretKey: 'postgres-password',
+        remoteRef: {
+          key: 'metrics-server/staging/keycloak-postgres',
+          property: 'postgres-password',
+        },
+      }),
+      expect.objectContaining({
+        secretKey: 'admin-password',
+        remoteRef: {
+          key: 'metrics-server/staging/keycloak',
+          property: 'admin-password',
+        },
+      }),
+    ]);
+  });
+
+  maybeTest('does not render ExternalSecret resources without staging overrides', () => {
+    const rendered = execFileSync('helm', ['template', 'test', 'deploy/chart'], { encoding: 'utf8' });
+    const docs = yaml.loadAll(rendered).filter(Boolean);
+
+    expect(docs.filter((doc) => doc.kind === 'ExternalSecret')).toHaveLength(0);
   });
 });
