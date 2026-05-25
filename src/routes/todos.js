@@ -6,17 +6,12 @@ const {
   updateTodo,
   deleteTodo,
 } = require('../repositories/todosRepository');
-
-const VALID_STATUS = new Set(['pending', 'in_progress', 'completed']);
-const VALID_PRIORITY = new Set(['low', 'medium', 'high']);
-const VALID_SORT_BY = new Set([
-  'created_asc',
-  'created_desc',
-  'updated_asc',
-  'updated_desc',
-  'last_viewed_asc',
-  'last_viewed_desc',
-]);
+const {
+  VALID_PRIORITY,
+  VALID_STATUS,
+  normalizeSortBy,
+  parseOptionalNonNegativeInt,
+} = require('../todos/rules');
 
 function withErrorHandling(logPrefix, handler) {
   return async (req, res) => {
@@ -27,18 +22,6 @@ function withErrorHandling(logPrefix, handler) {
       res.status(500).json({ error: 'Internal server error' });
     }
   };
-}
-
-function parseOptionalNonNegativeInt(v) {
-  if (v === undefined || v === null) return undefined;
-  const n = Number.parseInt(v, 10);
-  if (!Number.isSafeInteger(n) || n < 0) return undefined;
-  return n;
-}
-
-function normalizeSortBy(sortBy) {
-  if (sortBy === undefined) return undefined;
-  return VALID_SORT_BY.has(sortBy) ? sortBy : undefined;
 }
 
 function validateEnumOr400(value, validSet, fieldName, res) {
