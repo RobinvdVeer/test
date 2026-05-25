@@ -450,7 +450,18 @@ describe('GET /todos/:id', () => {
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'UPDATE todos SET last_viewed = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
+      `WITH updated AS (
+  UPDATE todos
+  SET last_viewed = NOW()
+  WHERE id = $1 AND user_id = $2
+    AND (last_viewed IS NULL OR last_viewed < NOW() - interval '60 seconds')
+  RETURNING *
+)
+SELECT * FROM updated
+UNION ALL
+SELECT * FROM todos
+WHERE id = $1 AND user_id = $2
+  AND NOT EXISTS (SELECT 1 FROM updated);`,
       ['7', 'u1']
     );
   });
