@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const bodyParser = require('body-parser');
 const openApiDocument = require('../openapi.json');
 const { userMiddleware } = require('./middleware/user');
@@ -24,6 +25,8 @@ function createApp() {
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
+
+  app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
 
   registerFrontendRoutes(app);
 
