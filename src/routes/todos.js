@@ -42,11 +42,14 @@ function normalizeSortBy(sortBy) {
 }
 
 function validateEnumOr400(value, validSet, fieldName, res) {
-  if (value === undefined) return true;
+  // Treat null/empty-string as "missing" so repository defaults can apply.
+  if (value === undefined || value === null || value === '') return true;
+
   if (!validSet.has(value)) {
     res.status(400).json({ error: `Invalid ${fieldName}` });
     return false;
   }
+
   return true;
 }
 
