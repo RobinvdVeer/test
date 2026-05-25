@@ -71,7 +71,7 @@ function renderLoginPage() {
 
         function base64UrlEncode(bytes) {
           const binary = String.fromCharCode(...bytes);
-          return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+          return btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '');
         }
 
         async function sha256(value) {

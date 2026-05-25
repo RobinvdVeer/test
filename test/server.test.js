@@ -9,7 +9,32 @@ const openApiDocument = require('../openapi.json');
 let queryMock;
 let endMock;
 
-function loadApp(now = '2024-01-01T00:00:00.000Z') {
+function base64UrlJson(value) {
+  return Buffer.from(JSON.stringify(value)).toString('base64url');
+}
+
+function signJwt(privateKey, payload, header = { alg: 'RS256', typ: 'JWT', kid: 'kid-1' }) {
+  const crypto = require('crypto');
+  const encodedHeader = base64UrlJson(header);
+  const encodedPayload = base64UrlJson(payload);
+  const signer = crypto.createSign('RSA-SHA256');
+  signer.update(`${encodedHeader}.${encodedPayload}`);
+  signer.end();
+  const signature = signer.sign(privateKey).toString('base64url');
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
+}
+
+function makeKeyPair(kid = 'kid-1') {
+  const crypto = require('crypto');
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const jwk = publicKey.export({ format: 'jwk' });
+  jwk.kid = kid;
+  jwk.alg = 'RS256';
+  jwk.use = 'sig';
+  return { privateKey, jwk };
+}
+
+function loadApp(now = '2024-01-01T00:00:00.000Z', { keycloak = false } = {}) {
   jest.resetModules();
   jest.useFakeTimers();
   jest.setSystemTime(new Date(now));
@@ -19,9 +44,22 @@ function loadApp(now = '2024-01-01T00:00:00.000Z') {
     process.env.DATABASE_URL ||
     'postgresql://test:test@localhost:5432/testdb';
   process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret';
+  if (keycloak) {
+    process.env.KEYCLOAK_ISSUER = 'http://keycloak.local/realms/todos';
+    process.env.KEYCLOAK_JWKS_URL = 'http://keycloak.local/jwks';
+    process.env.KEYCLOAK_CLIENT_ID = 'todo-frontend';
+  } else {
+    delete process.env.KEYCLOAK_ISSUER;
+    delete process.env.KEYCLOAK_JWKS_URL;
+    delete process.env.KEYCLOAK_CLIENT_ID;
+  }
 
   queryMock = jest.fn();
   endMock = jest.fn((cb) => cb && cb());
+  jest.spyOn(global, 'fetch').mockResolvedValue({
+    ok: true,
+    json: async () => ({ keys: [] }),
+  });
   jest.doMock('pg', () => ({
     Pool: jest.fn(() => ({ query: queryMock, end: endMock })),
   }));
@@ -44,6 +82,7 @@ function upsertSql() {
 afterEach(() => {
   jest.useRealTimers();
   jest.dontMock('pg');
+  jest.restoreAllMocks();
 });
 
 describe('public discovery and health endpoints', () => {
@@ -88,6 +127,51 @@ describe('public discovery and health endpoints', () => {
 });
 
 describe('protected middleware', () => {
+  test('accepts a Keycloak Bearer token and scopes todos by token subject', async () => {
+    const { privateKey, jwk } = makeKeyPair('kid-1');
+    const app = loadApp(undefined, { keycloak: true });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ keys: [jwk] }),
+    });
+
+    const token = signJwt(privateKey, {
+      iss: process.env.KEYCLOAK_ISSUER,
+      sub: 'user-123',
+      exp: Math.floor(Date.now() / 1000) + 60,
+    });
+
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 1, title: 'todo' }] });
+
+    await request(app)
+      .get('/todos')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['user-123']);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
+      ['user-123', 50, 0]
+    );
+  });
+
+  test('rejects X-User-Id fallback when Keycloak mode is enabled', async () => {
+    const app = loadApp(undefined, { keycloak: true });
+
+    await request(app)
+      .get('/todos')
+      .set('X-User-Id', 'user-123')
+      .expect(401, { error: 'Authorization bearer token is required' });
+
+    await request(app)
+      .get('/metrics')
+      .set('X-User-Id', 'user-123')
+      .expect(401, { error: 'Authorization bearer token is required' });
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
   test('rejects protected routes without Bearer token before querying database', async () => {
     const app = loadApp();
 
