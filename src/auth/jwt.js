@@ -2,6 +2,7 @@ const crypto = require('crypto');
 
 const JWKS_CACHE_TTL_MS = 5 * 60 * 1000;
 const jwksCache = new Map();
+const jwksFetchPromises = new Map();
 
 function base64UrlEncode(input) {
   return Buffer.from(input)
@@ -24,17 +25,31 @@ async function fetchJwks(jwksUrl) {
     return cached.jwks;
   }
 
-  const response = await fetch(jwksUrl, {
-    headers: { accept: 'application/json' },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch JWKS: ${response.status}`);
+  const inFlight = jwksFetchPromises.get(jwksUrl);
+  if (inFlight) {
+    return inFlight;
   }
 
-  const jwks = await response.json();
-  jwksCache.set(jwksUrl, { jwks, cachedAt: now });
-  return jwks;
+  const fetchPromise = (async () => {
+    try {
+      const response = await fetch(jwksUrl, {
+        headers: { accept: 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch JWKS: ${response.status}`);
+      }
+
+      const jwks = await response.json();
+      jwksCache.set(jwksUrl, { jwks, cachedAt: Date.now() });
+      return jwks;
+    } finally {
+      jwksFetchPromises.delete(jwksUrl);
+    }
+  })();
+
+  jwksFetchPromises.set(jwksUrl, fetchPromise);
+  return fetchPromise;
 }
 
 function normalizeAudience(payloadAud) {
