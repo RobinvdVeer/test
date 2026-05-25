@@ -171,12 +171,11 @@ function renderCallbackPage() {
           }
 
           const expiresIn = Number(payload.expires_in || 0);
-          localStorage.setItem('todo_tokens', JSON.stringify({
-            access_token: payload.access_token,
-            refresh_token: payload.refresh_token,
-            id_token: payload.id_token,
-            expires_at: Date.now() + (expiresIn * 1000),
-          }));
+          sessionStorage.setItem('todo_access_token', payload.access_token);
+          sessionStorage.setItem(
+            'todo_access_token_expires_at',
+            String(Date.now() + (expiresIn * 1000))
+          );
 
           sessionStorage.removeItem('todo_pkce_state');
           sessionStorage.removeItem('todo_pkce_verifier');
@@ -264,50 +263,28 @@ function renderAppPage() {
           return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
         }
 
-        function getTokens() {
-          const raw = localStorage.getItem('todo_tokens');
-          return raw ? JSON.parse(raw) : null;
+        function getAccessToken() {
+          const token = sessionStorage.getItem('todo_access_token');
+          const expiresAt = Number(sessionStorage.getItem('todo_access_token_expires_at') || 0);
+
+          if (!token || !expiresAt || expiresAt <= Date.now()) {
+            sessionStorage.removeItem('todo_access_token');
+            sessionStorage.removeItem('todo_access_token_expires_at');
+            window.location.replace('/login');
+            return null;
+          }
+
+          return token;
         }
 
-        async function refreshTokenIfNeeded() {
-          const tokens = getTokens();
-          if (!tokens?.access_token) {
-            window.location.replace('/login');
-            throw new Error('Not authenticated');
-          }
-
-          if (!tokens.refresh_token) return tokens.access_token;
-          if (tokens.expires_at && tokens.expires_at > Date.now() + 30_000) return tokens.access_token;
-
-          const response = await fetch(config.tokenEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              grant_type: 'refresh_token',
-              client_id: config.clientId,
-              refresh_token: tokens.refresh_token,
-            }),
-          });
-
-          const payload = await response.json();
-          if (!response.ok) {
-            localStorage.removeItem('todo_tokens');
-            window.location.replace('/login');
-            throw new Error(payload.error_description || payload.error || 'Token refresh failed');
-          }
-
-          localStorage.setItem('todo_tokens', JSON.stringify({
-            access_token: payload.access_token,
-            refresh_token: payload.refresh_token || tokens.refresh_token,
-            id_token: payload.id_token || tokens.id_token,
-            expires_at: Date.now() + (Number(payload.expires_in || 0) * 1000),
-          }));
-
-          return payload.access_token;
+        function requireAccessToken() {
+          const token = getAccessToken();
+          if (!token) throw new Error('Not authenticated');
+          return token;
         }
 
         async function apiFetch(path, options = {}) {
-          const token = await refreshTokenIfNeeded();
+          const token = requireAccessToken();
           const response = await fetch(path, {
             ...options,
             headers: {
@@ -318,7 +295,8 @@ function renderAppPage() {
           });
 
           if (response.status === 401) {
-            localStorage.removeItem('todo_tokens');
+            sessionStorage.removeItem('todo_access_token');
+            sessionStorage.removeItem('todo_access_token_expires_at');
             window.location.replace('/login');
           }
 
@@ -328,23 +306,42 @@ function renderAppPage() {
         function renderTodos(items) {
           todoList.innerHTML = '';
           if (!items.length) {
-            todoList.innerHTML = '<li class="muted">No todos yet.</li>';
+            const empty = document.createElement('li');
+            empty.className = 'muted';
+            empty.textContent = 'No todos yet.';
+            todoList.appendChild(empty);
             return;
           }
 
           for (const item of items) {
             const li = document.createElement('li');
             li.className = 'card todo';
-            li.innerHTML =
-              '<div>' +
-                '<strong>' + item.title + '</strong>' +
-                '<small>id ' + item.id + ' · ' + (item.category || 'uncategorized') + ' · ' + item.priority + '</small>' +
-                '<small class="status">' + item.status + '</small>' +
-                '<small>' + (item.description || '') + '</small>' +
-              '</div>' +
-              '<div>' +
-                '<button data-delete="' + item.id + '">Delete</button>' +
-              '</div>';
+
+            const left = document.createElement('div');
+            const title = document.createElement('strong');
+            title.textContent = item.title;
+            const meta = document.createElement('small');
+            meta.textContent = 'id ' + item.id + ' · ' + (item.category || 'uncategorized') + ' · ' + item.priority;
+            const status = document.createElement('small');
+            status.className = 'status';
+            status.textContent = item.status;
+            const description = document.createElement('small');
+            description.textContent = item.description || '';
+
+            left.appendChild(title);
+            left.appendChild(meta);
+            left.appendChild(status);
+            left.appendChild(description);
+
+            const right = document.createElement('div');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.dataset.delete = String(item.id);
+            button.textContent = 'Delete';
+            right.appendChild(button);
+
+            li.appendChild(left);
+            li.appendChild(right);
             todoList.appendChild(li);
           }
         }
@@ -404,16 +401,17 @@ function renderAppPage() {
         }));
 
         logoutBtn.addEventListener('click', () => {
-          localStorage.removeItem('todo_tokens');
+          sessionStorage.removeItem('todo_access_token');
+          sessionStorage.removeItem('todo_access_token_expires_at');
           window.location.assign('/login');
         });
 
-        const session = getTokens();
-        if (!session?.access_token) {
+        const accessToken = getAccessToken();
+        if (!accessToken) {
           window.location.replace('/login');
         } else {
           try {
-            const payload = decodePayload(session.access_token);
+            const payload = decodePayload(accessToken);
             whoami.textContent = 'Signed in as ' + payload.sub;
           } catch (_) {
             whoami.textContent = 'Signed in';

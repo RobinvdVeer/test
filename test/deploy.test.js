@@ -29,6 +29,8 @@ describe('docker compose deployability conventions', () => {
     const rendered = execFileSync('env', [
       '-u', 'DATABASE_URL',
       'POSTGRES_PASSWORD=test',
+      'KEYCLOAK_POSTGRES_PASSWORD=test',
+      'KEYCLOAK_ADMIN_PASSWORD=test',
       'JWT_SECRET=test',
       'docker', 'compose', 'config'
     ], { encoding: 'utf8' });

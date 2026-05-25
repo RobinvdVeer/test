@@ -126,6 +126,14 @@ async function verifyKeycloakJwt(token) {
     throw new Error('Invalid token subject');
   }
 
+  const aud = payload.aud;
+  const audienceMatches = Array.isArray(aud)
+    ? aud.includes(config.clientId)
+    : aud === config.clientId;
+  if (!audienceMatches && payload.azp !== config.clientId) {
+    throw new Error('Invalid token audience');
+  }
+
   return payload;
 }
 
