@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { getAuthEndpoints } = require('../auth/keycloak');
 const { pageShell } = require('./pageShell');
 
@@ -5,6 +7,7 @@ function renderAppPage() {
   return pageShell({
     title: 'Todos',
     config: getAuthEndpoints(),
+    scriptContent: fs.readFileSync(path.join(__dirname, '../../public/assets/app.js'), 'utf8'),
     scriptSrc: '/assets/app.js',
     body: `
       <header>

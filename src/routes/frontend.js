@@ -3,6 +3,7 @@ const { renderCallbackPage } = require('../views/callbackPage');
 const { renderAppPage } = require('../views/appPage');
 
 function registerFrontendRoutes(app) {
+  app.get('/', (_req, res) => res.redirect('/app'));
   app.use((req, res, next) => {
     if (req.method !== 'GET') return next();
 

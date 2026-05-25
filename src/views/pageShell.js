@@ -2,14 +2,16 @@ function escapeForInlineScript(value) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-function pageShell({ title, body, config, scriptSrc }) {
+function pageShell({ title, body, config, scriptContent, scriptSrc }) {
   const configScript = config === undefined
     ? ''
     : `<script>window.__AUTH_CONFIG__ = ${escapeForInlineScript(config)};</script>`;
 
-  const scriptTag = scriptSrc
-    ? `<script defer src="${scriptSrc}"></script>`
-    : '';
+  const scriptTag = scriptContent
+    ? `<script>${scriptContent}</script>`
+    : scriptSrc
+      ? `<script defer src="${scriptSrc}"></script>`
+      : '';
 
   return `<!doctype html>
 <html lang="en">
