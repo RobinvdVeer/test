@@ -33,6 +33,18 @@ app:
   port: 3000
   nodeEnv: production
   publicUrl: http://localhost:3000
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
   database:
     secretName: metrics-server-database
     secretKey: database-url
@@ -125,13 +137,6 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []
-
-securityContext:
-  runAsNonRoot: true
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
-  allowPrivilegeEscalation: false
 
 resources: {}
 
