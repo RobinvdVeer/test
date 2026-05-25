@@ -108,6 +108,36 @@
         }
       }
     },
+    "/": {
+      "get": {
+        "summary": "Todo app home page",
+        "responses": {
+          "200": {
+            "description": "HTML page"
+          }
+        }
+      }
+    },
+    "/login": {
+      "get": {
+        "summary": "Login page",
+        "responses": {
+          "200": {
+            "description": "HTML page"
+          }
+        }
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "summary": "OIDC callback page",
+        "responses": {
+          "200": {
+            "description": "HTML page"
+          }
+        }
+      }
+    },
     "/api/docs/openapi.json": {
       "get": {
         "summary": "OpenAPI document alias",
@@ -129,6 +159,16 @@
         "responses": {
           "200": {
             "description": "Service is healthy"
+          }
+        }
+      }
+    },
+    "/auth-config.json": {
+      "get": {
+        "summary": "Auth configuration for the frontend",
+        "responses": {
+          "200": {
+            "description": "Auth config"
           }
         }
       }
