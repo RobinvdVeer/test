@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Example Todo App API Requests
-# This script demonstrates how to use the Todo App API
+# Example Metrics Todo API Requests
+# This script demonstrates how to use the Metrics Todo API
 
 BASE_URL="http://localhost:3000"
 USER_ID="demo-user-$(date +%s)"
 
-echo "=== Todo App API Examples ==="
+echo "=== Metrics Todo API Examples ==="
 echo "Using User ID: $USER_ID"
 echo ""
 

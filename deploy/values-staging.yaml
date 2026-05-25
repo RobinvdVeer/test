@@ -1,0 +1,23 @@
+image:
+  app:
+    repository: ghcr.io/robinvdveer/metrics-server
+    tag: latest
+
+replicaCount: 1
+
+ingress:
+  enabled: false
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: cluster-secret-store
+    kind: ClusterSecretStore
+  database:
+    remoteRef:
+      key: metrics-server/staging/database
+      property: database-url
+  postgresPassword:
+    remoteRef:
+      key: metrics-server/staging/postgres
+      property: postgres-password

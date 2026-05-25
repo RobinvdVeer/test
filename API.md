@@ -1,12 +1,14 @@
-# Todo App API Documentation
+# Metrics Todo API Documentation
 
 ## Overview
-This is a multi-user todo app backend built with Express.js and PostgreSQL. Users are identified via the `X-User-Id` header.
+This is a multi-user todo and metrics API built with Express.js and PostgreSQL. Users are identified via the `X-User-Id` header.
 
 ## Getting Started
 
 ### Running with Docker Compose
 ```bash
+cp .env.example .env
+# Edit .env and set POSTGRES_PASSWORD to a local development password.
 docker-compose up --build
 ```
 
@@ -23,7 +25,7 @@ npm start
 ```
 
 ## Authentication
-All requests (except `/health` and `/metrics`) require the `X-User-Id` header:
+Todo requests require the `X-User-Id` header. Public endpoints (`/health`, `/metrics`, `/openapi.json`, and `/api/docs/openapi.json`) do not require it:
 ```
 X-User-Id: your-unique-user-id
 ```
@@ -35,6 +37,18 @@ X-User-Id: your-unique-user-id
 GET /health
 ```
 Response: `{ "status": "ok" }`
+
+### OpenAPI Document
+```
+GET /openapi.json
+GET /api/docs/openapi.json
+```
+Returns the OpenAPI 3 document used by Kong or other API gateways for registration.
+
+Example:
+```bash
+curl http://localhost:3000/openapi.json
+```
 
 ### Metrics
 ```
@@ -91,8 +105,8 @@ Content-Type: application/json
 - `title` - Required
 - `description` - Optional
 - `category` - Optional
-- `status` - Optional (default: "pending")
-- `priority` - Optional (default: "medium")
+- `status` - Optional; one of `pending`, `in_progress`, `completed` (default: `pending`)
+- `priority` - Optional; one of `low`, `medium`, `high` (default: `medium`)
 
 Response: `201 Created` with the created todo object.
 
@@ -129,7 +143,7 @@ Content-Type: application/json
 }
 ```
 
-All fields are optional. Only provided fields are updated. The `updated_at` and `last_viewed` timestamps are automatically updated.
+All fields are optional. Only provided fields are updated. If supplied, `status` must be one of `pending`, `in_progress`, `completed`, and `priority` must be one of `low`, `medium`, `high`. The `updated_at` and `last_viewed` timestamps are automatically updated.
 
 Response: Updated todo object with status `200 OK`.
 
@@ -153,8 +167,8 @@ Response: `200 OK` with deleted todo details.
 - `title` - Todo title (required)
 - `description` - Todo description
 - `category` - Category/tag for organizing todos
-- `status` - Todo status (pending, in_progress, completed)
-- `priority` - Priority level (low, medium, high)
+- `status` - Todo status (`pending`, `in_progress`, or `completed`)
+- `priority` - Priority level (`low`, `medium`, or `high`)
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
 - `last_viewed` - Last time the todo was viewed or updated (used for "forgotten items" insights)
@@ -194,6 +208,14 @@ Status: `404 Not Found`
 ```json
 {
   "error": "Title is required"
+}
+```
+Status: `400 Bad Request`
+
+### Invalid Status or Priority
+```json
+{
+  "error": "Status must be one of: pending, in_progress, completed"
 }
 ```
 Status: `400 Bad Request`

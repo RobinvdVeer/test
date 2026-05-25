@@ -1,0 +1,87 @@
+replicaCount: 1
+
+image:
+  app:
+    repository: ghcr.io/robinvdveer/metrics-server
+    tag: latest
+    pullPolicy: IfNotPresent
+  postgres:
+    repository: postgres
+    tag: 16-alpine
+    pullPolicy: IfNotPresent
+
+service:
+  app:
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+  postgres:
+    type: ClusterIP
+    port: 5432
+
+app:
+  port: 3000
+  nodeEnv: production
+  database:
+    secretName: metrics-server-database
+    secretKey: database-url
+  jwt:
+    secretName: metrics-server-jwt
+    secretKey: jwt-secret
+
+# Optional chart-created secrets. Leave values empty in git; inject with
+# --set-string secrets.databaseUrl=$DATABASE_URL and
+# --set-string secrets.postgresPassword=$POSTGRES_PASSWORD, or provide your own
+# Kubernetes/External/Sealed Secret with the names above.
+secrets:
+  create: false
+  databaseUrl: ""
+  postgresPassword: ""
+
+externalSecrets:
+  enabled: false
+  refreshInterval: 1h
+  secretStoreRef:
+    name: cluster-secret-store
+    kind: ClusterSecretStore
+  database:
+    remoteRef:
+      key: metrics-server/database
+      property: database-url
+  postgresPassword:
+    remoteRef:
+      key: metrics-server/postgres
+      property: postgres-password
+
+postgres:
+  enabled: true
+  auth:
+    username: todouser
+    database: tododb
+    passwordSecretName: metrics-server-postgres
+    passwordSecretKey: postgres-password
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClassName: ""
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: metrics-server.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

@@ -1,31 +1,32 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: todo_postgres
+    container_name: metrics_server_postgres
     environment:
-      POSTGRES_USER: todouser
-      POSTGRES_PASSWORD: todopass
-      POSTGRES_DB: tododb
+      POSTGRES_USER: ${POSTGRES_USER:-todouser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or .env file}
+      POSTGRES_DB: ${POSTGRES_DB:-tododb}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U todouser -d tododb"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   app:
-    build: .
-    container_name: todo_app
+    build:
+      context: .
+    image: ghcr.io/robinvdveer/metrics-server:latest
+    container_name: metrics_server_app
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://todouser:todopass@postgres:5432/tododb
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-todouser}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or .env file}@postgres:5432/${POSTGRES_DB:-tododb}}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret}
       NODE_ENV: development
     depends_on:
       postgres:
