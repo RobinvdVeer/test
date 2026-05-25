@@ -7,7 +7,7 @@ async function ensureUserExists(userId) {
   );
 }
 
-function userMiddleware(req, res, next) {
+async function userMiddleware(req, res, next) {
   const userId = req.headers['x-user-id'];
   if (!userId) {
     return res.status(400).json({ error: 'X-User-Id header is required' });
@@ -15,12 +15,13 @@ function userMiddleware(req, res, next) {
 
   req.userId = userId;
 
-  ensureUserExists(userId)
-    .then(() => next())
-    .catch((error) => {
-      console.error('Error ensuring user exists:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    });
+  try {
+    await ensureUserExists(userId);
+    next();
+  } catch (error) {
+    console.error('Error ensuring user exists:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 module.exports = { userMiddleware };

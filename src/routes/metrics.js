@@ -13,9 +13,9 @@ function formatUptime(seconds) {
   return parts.join(' ');
 }
 
-function registerMetricsRoutes(router, startTime) {
+function registerMetricsRoutes(app, startTime) {
   // /metrics endpoint that returns process uptime
-  router.get('/metrics', (req, res) => {
+  app.get('/metrics', (req, res) => {
     const uptime = (Date.now() - startTime) / 1000; // uptime in seconds
 
     res.json({

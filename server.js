@@ -1,19 +1,23 @@
 const { createApp } = require('./src/app');
-const { pool } = require('./src/db/pool');
 const { getConfig } = require('./src/config');
 
 const { PORT } = getConfig();
 
-if (!process.env.DATABASE_URL) {
-  console.error('DATABASE_URL environment variable is required');
-  process.exit(1);
-}
+let pool;
 
 const app = createApp();
 
 let server;
 
 if (require.main === module) {
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL environment variable is required');
+    process.exit(1);
+  }
+
+  // Import DB pool only when the server is actually starting.
+  ({ pool } = require('./src/db/pool'));
+
   server = app.listen(PORT, () => {
     console.log(`Metrics & Todo server running on http://localhost:${PORT}`);
     console.log(`Access openapi at http://localhost:${PORT}/openapi.json`);
