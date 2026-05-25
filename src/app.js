@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const openApiDocument = require('../openapi.json');
 const { userMiddleware } = require('./middleware/user');
+const { registerFrontendRoutes } = require('./routes/frontend');
 const { registerMetricsRoutes } = require('./routes/metrics');
 const { registerTodosRoutes } = require('./routes/todos');
 
@@ -11,18 +12,20 @@ function createApp() {
 
   app.use(bodyParser.json({ limit: '1mb' }));
 
-  // Public endpoints used by gateways, health probes, and API discovery.
-  app.get('/openapi.json', (req, res) => {
+  // Public endpoints used by gateways, health probes, and the browser app.
+  app.get('/openapi.json', (_req, res) => {
     res.json(openApiDocument);
   });
 
-  app.get('/api/docs/openapi.json', (req, res) => {
+  app.get('/api/docs/openapi.json', (_req, res) => {
     res.json(openApiDocument);
   });
 
-  app.get('/health', (req, res) => {
+  app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
+
+  registerFrontendRoutes(app);
 
   // Remaining API requires identification.
   app.use(userMiddleware);

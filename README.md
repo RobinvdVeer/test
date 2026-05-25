@@ -4,7 +4,7 @@ A multi-user todo and metrics API built with Express.js and PostgreSQL. Includes
 
 ## Features
 
-✅ **Multi-user support** - Users identified via X-User-Id header  
+✅ **Multi-user support** - Users identified via Keycloak JWT bearer tokens  
 ✅ **Full CRUD operations** - Create, read, update, delete todos  
 ✅ **Categories and priorities** - Organize todos by category and priority level  
 ✅ **Status tracking** - Track todo completion status  
@@ -19,11 +19,11 @@ A multi-user todo and metrics API built with Express.js and PostgreSQL. Includes
 ### With Docker Compose
 ```bash
 cp .env.example .env
-# Edit .env and set POSTGRES_PASSWORD to a local development password.
+# Edit .env and set the database and Keycloak passwords.
 docker-compose up --build
 ```
 
-The app will be available at `http://localhost:3000`. You can also run one-off with `POSTGRES_PASSWORD=change-me docker-compose up --build`.
+The app will be available at `http://localhost:3000` and the login page at `http://localhost:3000/login`. Keycloak runs on `http://localhost:8081`.
 
 ### Local Development
 ```bash
@@ -41,7 +41,7 @@ See [API.md](./API.md) for detailed API documentation.
 ```bash
 # Create a todo
 curl -X POST http://localhost:3000/todos \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Complete project",
@@ -50,10 +50,10 @@ curl -X POST http://localhost:3000/todos \
   }'
 
 # List todos
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?category=work"
 
 # Check metrics
-curl -H "X-User-Id: user123" http://localhost:3000/metrics
+curl -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:3000/metrics
 
 # Fetch OpenAPI document for Kong/gateway registration
 curl http://localhost:3000/openapi.json
@@ -62,9 +62,9 @@ curl http://localhost:3000/openapi.json
 ## Architecture
 
 ### Multi-user Design
-- Users are identified via the `X-User-Id` request header
+- Users are identified via Keycloak access tokens
 - Each user has isolated todo data
-- Simple header-based identification (ready for future JWT integration)
+- JWT bearer authentication with PKCE login flow
 
 ### Database Schema
 - **users** table - Stores user information

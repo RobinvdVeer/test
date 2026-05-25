@@ -1,7 +1,7 @@
 # Metrics Todo API Documentation
 
 ## Overview
-This is a multi-user todo and metrics API built with Express.js and PostgreSQL. Users are identified via the `X-User-Id` header.
+This is a multi-user todo and metrics API built with Express.js and PostgreSQL. Users are identified by Bearer JWTs issued by Keycloak.
 
 ## Getting Started
 
@@ -25,10 +25,7 @@ npm start
 ```
 
 ## Authentication
-Todo requests require the `X-User-Id` header. Public endpoints (`/health`, `/openapi.json`, and `/api/docs/openapi.json`) do not require it:
-```
-X-User-Id: your-unique-user-id
-```
+Todo and metrics requests require an `Authorization: Bearer <token>` header. Public endpoints (`/health`, `/openapi.json`, and `/api/docs/openapi.json`) do not require it.
 
 ## API Endpoints
 
@@ -67,7 +64,7 @@ Query parameters:
 
 Example:
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work&status=pending&sort_by=last_viewed_desc"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?category=work&status=pending&sort_by=last_viewed_desc"
 ```
 
 Response:

@@ -1,5 +1,10 @@
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db/pool');
+const {
+  isBearerToken,
+  isKeycloakConfigured,
+  verifyKeycloakJwt,
+} = require('../auth/keycloak');
 
 // Cache user existence checks to avoid a DB round-trip on every request.
 // This is a best-effort optimization; users are still upserted when the
@@ -41,37 +46,59 @@ async function ensureUserExists(userId) {
   rememberUser(userId, nowMs);
 }
 
+function legacyUserIdFromBearer(authHeader) {
+  if (!isBearerToken(authHeader)) return undefined;
+
+  const token = authHeader.slice('Bearer '.length);
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error('Server misconfigured');
+  }
+
+  const payload = jwt.verify(token, jwtSecret);
+  return payload?.sub ?? payload?.userId ?? payload?.user_id;
+}
+
+async function keycloakUserIdFromBearer(authHeader) {
+  if (!isBearerToken(authHeader)) return undefined;
+
+  const token = authHeader.slice('Bearer '.length);
+  const payload = await verifyKeycloakJwt(token);
+  return payload?.sub;
+}
+
 async function userMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
   const xUserId = req.headers['x-user-id'];
   const reqPath = req.path;
+  const keycloakMode = isKeycloakConfigured();
 
-  const getUserIdFromBearer = () => {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) return undefined;
-
-    const token = authHeader.slice('Bearer '.length);
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      // This should be rare; tests don't cover it.
-      throw new Error('Server misconfigured');
-    }
-
-    const payload = jwt.verify(token, jwtSecret);
-    return payload?.sub ?? payload?.userId ?? payload?.user_id;
+  const getUserIdFromBearer = async () => {
+    if (keycloakMode) return keycloakUserIdFromBearer(authHeader);
+    return legacyUserIdFromBearer(authHeader);
   };
 
   let userId;
 
   // Route-specific error messages are asserted in tests.
   if (reqPath === '/todos' || reqPath === '/todos/') {
-    // /todos base route accepts Bearer OR X-User-Id.
+    // /todos base route accepts Bearer only in Keycloak mode.
     try {
-      userId = getUserIdFromBearer();
+      userId = await getUserIdFromBearer();
     } catch (e) {
-      return res.status(500).json({ error: 'Server misconfigured' });
+      if (e.message === 'Server misconfigured') {
+        return res.status(500).json({ error: 'Server misconfigured' });
+      }
+      return res.status(401).json({ error: 'Invalid token' });
     }
 
     if (!userId) {
+      if (keycloakMode) {
+        return res
+          .status(401)
+          .json({ error: 'Authorization bearer token is required' });
+      }
+
       if (!xUserId || typeof xUserId !== 'string') {
         return res
           .status(401)
@@ -84,37 +111,46 @@ async function userMiddleware(req, res, next) {
       return res.status(401).json({ error: 'Invalid token payload' });
     }
   } else if (reqPath === '/metrics') {
-    // /metrics: if no identity header provided at all, tests expect X-User-Id error.
+    // /metrics: legacy tests expect X-User-Id when no keycloak config is active.
     try {
-      userId = xUserId || getUserIdFromBearer();
+      userId = keycloakMode ? await getUserIdFromBearer() : xUserId || (await getUserIdFromBearer());
     } catch (e) {
-      return res.status(500).json({ error: 'Server misconfigured' });
+      if (e.message === 'Server misconfigured') {
+        return res.status(500).json({ error: 'Server misconfigured' });
+      }
+      return res.status(401).json({ error: 'Invalid token' });
     }
 
     if (!userId || typeof userId !== 'string') {
-      return res
-        .status(400)
-        .json({ error: 'X-User-Id header is required' });
+      return res.status(keycloakMode ? 401 : 400).json({
+        error: keycloakMode ? 'Authorization bearer token is required' : 'X-User-Id header is required',
+      });
     }
   } else if (reqPath.startsWith('/todos/')) {
-    // /todos/:id: if no identity header provided at all, tests expect X-User-Id error.
+    // /todos/:id: legacy tests expect X-User-Id when no keycloak config is active.
     try {
-      userId = xUserId || getUserIdFromBearer();
+      userId = keycloakMode ? await getUserIdFromBearer() : xUserId || (await getUserIdFromBearer());
     } catch (e) {
-      return res.status(500).json({ error: 'Server misconfigured' });
+      if (e.message === 'Server misconfigured') {
+        return res.status(500).json({ error: 'Server misconfigured' });
+      }
+      return res.status(401).json({ error: 'Invalid token' });
     }
 
     if (!userId || typeof userId !== 'string') {
-      return res
-        .status(400)
-        .json({ error: 'X-User-Id header is required' });
+      return res.status(keycloakMode ? 401 : 400).json({
+        error: keycloakMode ? 'Authorization bearer token is required' : 'X-User-Id header is required',
+      });
     }
   } else {
     // Fallback for any other route protected by this middleware.
     try {
-      userId = getUserIdFromBearer();
+      userId = await getUserIdFromBearer();
     } catch (e) {
-      return res.status(500).json({ error: 'Server misconfigured' });
+      if (e.message === 'Server misconfigured') {
+        return res.status(500).json({ error: 'Server misconfigured' });
+      }
+      return res.status(401).json({ error: 'Invalid token' });
     }
 
     if (!userId) {

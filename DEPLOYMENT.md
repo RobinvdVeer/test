@@ -179,7 +179,7 @@ curl http://your-app/openapi.json
 ### Security Considerations
 
 1. **API Security**
-   - ✅ User isolation via X-User-Id (replace with JWT in production)
+   - ✅ User isolation via Keycloak JWT bearer tokens
    - ✅ Parameterized queries (prevents SQL injection)
    - [ ] Add rate limiting
    - [ ] Add HTTPS/TLS

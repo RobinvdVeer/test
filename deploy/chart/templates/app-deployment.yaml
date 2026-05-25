@@ -43,6 +43,14 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.app.database.secretName }}
                   key: {{ .Values.app.database.secretKey }}
+            - name: APP_BASE_URL
+              value: {{ .Values.app.baseUrl | quote }}
+            - name: KEYCLOAK_ISSUER
+              value: {{ .Values.app.auth.issuer | quote }}
+            - name: KEYCLOAK_JWKS_URL
+              value: {{ .Values.app.auth.jwksUrl | quote }}
+            - name: KEYCLOAK_CLIENT_ID
+              value: {{ .Values.app.auth.clientId | quote }}
 
           readinessProbe:
             httpGet:

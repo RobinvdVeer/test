@@ -17,6 +17,47 @@ services:
       timeout: 5s
       retries: 5
 
+  keycloak-postgres:
+    image: postgres:16-alpine
+    container_name: metrics_server_keycloak_postgres
+    environment:
+      POSTGRES_USER: ${KEYCLOAK_POSTGRES_USER:-keycloak}
+      POSTGRES_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${KEYCLOAK_POSTGRES_DB:-keycloak}
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: metrics_server_keycloak
+    command: ["start-dev", "--import-realm"]
+    ports:
+      - "127.0.0.1:8081:8080"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-change-me}
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-postgres
+      KC_DB_URL_PORT: 5432
+      KC_DB_URL_DATABASE: ${KEYCLOAK_POSTGRES_DB:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_POSTGRES_USER:-keycloak}
+      KC_DB_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD:-change-me}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8081}
+      KC_HOSTNAME_STRICT: "false"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    volumes:
+      - ./deploy/keycloak/realm-import.json:/opt/keycloak/data/import/realm-import.json:ro
+
   app:
     build:
       context: .
@@ -28,14 +69,20 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-todouser}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or .env file}@postgres:5432/${POSTGRES_DB:-tododb}}
-      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your environment or .env file}
       NODE_ENV: development
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8081/realms/todos}
+      KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-http://keycloak:8080/realms/todos/protocol/openid-connect/certs}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-todo-frontend}
     depends_on:
       postgres:
         condition: service_healthy
+      keycloak:
+        condition: service_started
     volumes:
       - .:/app
       - /app/node_modules
 
 volumes:
   postgres_data:
+  keycloak_postgres_data:

@@ -3,7 +3,7 @@
   "info": {
     "title": "Metrics Todo API",
     "version": "1.0.0",
-    "description": "HTTP API for process metrics and user-scoped todo management. Todo and metrics endpoints require a Bearer JWT token."
+    "description": "HTTP API for process metrics and user-scoped todo management. Todo and metrics endpoints require a Bearer JWT token issued by Keycloak."
   },
   "servers": [
     {
@@ -15,7 +15,8 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT"
+        "bearerFormat": "JWT",
+        "description": "Keycloak access token"
       }
     },
     "schemas": {

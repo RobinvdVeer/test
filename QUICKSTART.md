@@ -8,11 +8,11 @@
 ### Start the Application
 ```bash
 cp .env.example .env
-# Edit .env and set POSTGRES_PASSWORD to a local development password.
+# Edit .env and set the database and Keycloak passwords.
 docker-compose up --build
 ```
 
-The app will be available at `http://localhost:3000`
+The app will be available at `http://localhost:3000` and the login page at `http://localhost:3000/login`
 
 ## Common Commands
 
@@ -24,7 +24,7 @@ curl http://localhost:3000/health
 ### Create a Todo
 ```bash
 curl -X POST http://localhost:3000/todos \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Buy groceries",
@@ -35,28 +35,28 @@ curl -X POST http://localhost:3000/todos \
 
 ### List Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos"
 ```
 
 ### List Work Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?category=work"
 ```
 
 ### List Pending Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?status=pending"
 ```
 
 ### Find Forgotten Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```
 
 ### Mark Todo as Complete
 ```bash
 curl -X PUT http://localhost:3000/todos/1 \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}'
 ```
@@ -64,7 +64,7 @@ curl -X PUT http://localhost:3000/todos/1 \
 ### Delete a Todo
 ```bash
 curl -X DELETE http://localhost:3000/todos/1 \
-  -H "X-User-Id: user123"
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 ### Run Example Script
@@ -85,9 +85,9 @@ Use `.env.example` as the template for local development.
 
 
 ### User Identification
-- Todo endpoints require the `X-User-Id` header
+- Todo endpoints require a Bearer JWT from Keycloak
 - Each user gets isolated data
-- Example: `X-User-Id: user123`
+- Example: `Authorization: Bearer $ACCESS_TOKEN`
 
 ### Status Values
 - `pending` - Not started

@@ -21,10 +21,10 @@ if (require.main === module) {
   server = app.listen(PORT, () => {
     console.log(`Metrics & Todo server running on http://localhost:${PORT}`);
     console.log(`Access openapi at http://localhost:${PORT}/openapi.json`);
-    console.log(
-      `Access metrics at http://localhost:${PORT}/metrics (requires X-User-Id header)`
-    );
-    console.log('Access todos at /todos (requires X-User-Id header)');
+    console.log(`Access the login page at http://localhost:${PORT}/login`);
+    console.log(`Access the app at http://localhost:${PORT}/app`);
+    console.log(`Access metrics at http://localhost:${PORT}/metrics`);
+    console.log('Access todos at /todos');
   });
 
   // Graceful shutdown
