@@ -1,7 +1,7 @@
 # Metrics Todo API Documentation
 
 ## Overview
-This is a multi-user todo and metrics API built with Express.js and PostgreSQL. Users are identified via the `X-User-Id` header.
+This is a multi-user todo and metrics API built with Express.js and PostgreSQL. Todo requests are authenticated with Keycloak JWT bearer tokens and user ownership is derived from the token `sub` claim.
 
 ## Getting Started
 
@@ -25,10 +25,14 @@ npm start
 ```
 
 ## Authentication
-Todo requests require the `X-User-Id` header. Public endpoints (`/health`, `/openapi.json`, and `/api/docs/openapi.json`) do not require it:
+Open `/login` in the browser to sign in with Keycloak using PKCE. After login, use the returned access token as a bearer token on todo requests.
+
+Example:
+```bash
+Authorization: Bearer <access_token>
 ```
-X-User-Id: your-unique-user-id
-```
+
+Public endpoints (`/health`, `/openapi.json`, `/api/docs/openapi.json`, and `/metrics`) do not require authentication.
 
 ## API Endpoints
 
@@ -67,7 +71,7 @@ Query parameters:
 
 Example:
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work&status=pending&sort_by=last_viewed_desc"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?category=work&status=pending&sort_by=last_viewed_desc"
 ```
 
 Response:
@@ -158,7 +162,7 @@ Response: `200 OK` with deleted todo details.
 
 ### Users Table
 - `id` - Auto-incremented primary key
-- `user_id` - Unique user identifier from X-User-Id header
+- `user_id` - Unique user identifier derived from the JWT `sub` claim
 - `created_at` - Account creation timestamp
 
 ### Todos Table
@@ -181,20 +185,20 @@ The `last_viewed` field tracks the last time a user viewed or interacted with a 
 
 Example query to find forgotten items:
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```
 
 This returns pending todos sorted by least recently viewed first.
 
 ## Error Responses
 
-### Missing X-User-Id Header
+### Missing Bearer Token
 ```json
 {
-  "error": "X-User-Id header is required"
+  "error": "Authorization bearer token is required"
 }
 ```
-Status: `400 Bad Request`
+Status: `401 Unauthorized`
 
 ### Todo Not Found
 ```json
@@ -233,7 +237,7 @@ Status: `500 Internal Server Error`
 ### Create a todo
 ```bash
 curl -X POST http://localhost:3000/todos \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Design database schema",
@@ -245,18 +249,18 @@ curl -X POST http://localhost:3000/todos \
 
 ### List all pending todos in work category
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work&status=pending"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?category=work&status=pending"
 ```
 
 ### Mark a todo as completed
 ```bash
 curl -X PUT http://localhost:3000/todos/1 \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}'
 ```
 
 ### Find forgotten todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```

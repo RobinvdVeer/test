@@ -29,15 +29,18 @@ npm start
 ### Deployment
 ```bash
 cp .env.example .env
-# Edit .env and set POSTGRES_PASSWORD to a local development password.
+# Edit .env and set the required passwords.
 docker-compose up --build
 ```
 
 This will:
-1. Start PostgreSQL container with persistent volume
-2. Initialize schema from `init-db.sql`
-3. Start Node.js app
-4. Expose app on `http://localhost:3000`
+1. Start the todo PostgreSQL container with persistent volume
+2. Start a dedicated Keycloak PostgreSQL container
+3. Start Keycloak and import the demo realm
+4. Start Node.js app
+5. Expose app on `http://localhost:3000`
+
+The browser login flow uses `http://localhost:3000/login` and Keycloak is exposed on `http://localhost:8081`.
 
 ### Teardown
 ```bash
@@ -60,8 +63,8 @@ docker-compose down
 **Setup:**
 - Build and push the app image as `ghcr.io/robinvdveer/metrics-server:<tag>`
 - Deploy with the Helm chart in `deploy/chart`
-- Supply database credentials as Kubernetes, External, or Sealed Secrets; do not commit real secret values
-- Use managed PostgreSQL (RDS, Cloud SQL, Azure Database for PostgreSQL) for production, or the chart's PostgreSQL service for simple environments
+- Supply todo database, Keycloak database, and Keycloak admin credentials as Kubernetes, External, or Sealed Secrets; do not commit real secret values
+- Use managed PostgreSQL for production, or the chart's PostgreSQL services for simple environments
 
 Primary Kubernetes deployment path:
 ```bash
@@ -69,13 +72,17 @@ docker build -t ghcr.io/robinvdveer/metrics-server:<tag> .
 docker push ghcr.io/robinvdveer/metrics-server:<tag>
 
 export POSTGRES_PASSWORD='replace-me'
+export KEYCLOAK_POSTGRES_PASSWORD='replace-me'
+export KEYCLOAK_ADMIN_PASSWORD='replace-me'
 export DATABASE_URL="postgresql://todouser:${POSTGRES_PASSWORD}@metrics-server-postgres:5432/tododb"
 helm upgrade --install metrics-server ./deploy/chart \
   -f ./deploy/values-staging.yaml \
   --set image.app.tag=<tag> \
   --set secrets.create=true \
   --set-string secrets.postgresPassword="$POSTGRES_PASSWORD" \
-  --set-string secrets.databaseUrl="$DATABASE_URL"
+  --set-string secrets.databaseUrl="$DATABASE_URL" \
+  --set-string secrets.keycloakPostgresPassword="$KEYCLOAK_POSTGRES_PASSWORD" \
+  --set-string secrets.keycloakAdminPassword="$KEYCLOAK_ADMIN_PASSWORD"
 ```
 
 See [deploy/README.md](./deploy/README.md) and [deploy/chart](./deploy/chart) for the chart values and secret options.
@@ -179,7 +186,7 @@ curl http://your-app/openapi.json
 ### Security Considerations
 
 1. **API Security**
-   - ✅ User isolation via X-User-Id (replace with JWT in production)
+   - ✅ User isolation via JWT bearer tokens (Keycloak)
    - ✅ Parameterized queries (prevents SQL injection)
    - [ ] Add rate limiting
    - [ ] Add HTTPS/TLS
@@ -284,6 +291,16 @@ PORT=3000
 POSTGRES_USER=todouser
 POSTGRES_DB=tododb
 POSTGRES_PASSWORD=change-me
+KEYCLOAK_POSTGRES_USER=keycloak
+KEYCLOAK_POSTGRES_DB=keycloak
+KEYCLOAK_POSTGRES_PASSWORD=change-me
+KEYCLOAK_ADMIN=admin
+KEYCLOAK_ADMIN_PASSWORD=change-me
+KEYCLOAK_ISSUER_URL=http://localhost:8081/realms/todos
+KEYCLOAK_JWKS_URL=http://keycloak:8080/realms/todos/protocol/openid-connect/certs
+KEYCLOAK_CLIENT_ID=todo-app
+AUTH_REDIRECT_URI=http://localhost:3000/auth/callback
+AUTH_POST_LOGOUT_REDIRECT_URI=http://localhost:3000/login
 DATABASE_URL=postgresql://todouser:change-me@localhost:5432/tododb
 NODE_ENV=development
 ```
@@ -292,11 +309,16 @@ NODE_ENV=development
 ```
 PORT=3000
 DATABASE_URL=postgresql://user:password@prod-db.example.com:5432/tododb
+KEYCLOAK_ISSUER_URL=https://keycloak.example.com/realms/todos
+KEYCLOAK_JWKS_URL=https://keycloak.example.com/realms/todos/protocol/openid-connect/certs
+KEYCLOAK_CLIENT_ID=todo-app
+AUTH_REDIRECT_URI=https://app.example.com/auth/callback
+AUTH_POST_LOGOUT_REDIRECT_URI=https://app.example.com/login
 NODE_ENV=production
 LOG_LEVEL=info
 ```
 
-For Docker Compose, copy `.env.example` to `.env` and set `POSTGRES_PASSWORD`; `DATABASE_URL` is optional and defaults from the PostgreSQL variables.
+For Docker Compose, copy `.env.example` to `.env` and set `POSTGRES_PASSWORD`, `KEYCLOAK_POSTGRES_PASSWORD`, and `KEYCLOAK_ADMIN_PASSWORD`; `DATABASE_URL` is optional and defaults from the PostgreSQL variables.
 
 ## Backup and Recovery
 

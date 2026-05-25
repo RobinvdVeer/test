@@ -12,7 +12,13 @@ function loadApp() {
   process.env.DATABASE_URL =
     process.env.DATABASE_URL ||
     'postgresql://test:test@localhost:5432/testdb';
-  process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret';
+  process.env.KEYCLOAK_ISSUER_URL =
+    process.env.KEYCLOAK_ISSUER_URL || 'https://keycloak.local/realms/todos';
+  process.env.KEYCLOAK_JWKS_URL =
+    process.env.KEYCLOAK_JWKS_URL ||
+    'https://keycloak.local/realms/todos/protocol/openid-connect/certs';
+  process.env.KEYCLOAK_CLIENT_ID =
+    process.env.KEYCLOAK_CLIENT_ID || 'todo-app';
 
   queryMock = jest.fn();
   jest.doMock('pg', () => ({
@@ -34,6 +40,10 @@ test('openapi.json is a valid OpenAPI 3 document for implemented routes', async 
   expect(Object.keys(openApiDocument.paths)).toEqual(expect.arrayContaining([
     '/openapi.json',
     '/api/docs/openapi.json',
+    '/auth-config.json',
+    '/',
+    '/login',
+    '/auth/callback',
     '/health',
     '/metrics',
     '/todos',

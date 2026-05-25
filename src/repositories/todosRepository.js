@@ -180,19 +180,6 @@ async function updateTodo(userId, id, { title, description, category, status, pr
     return { type: 'NO_FIELDS_TO_UPDATE' };
   }
 
-  // Tests expect an existence-check query when updating a single field.
-  const providedFieldCount = updateFields.length;
-  if (providedFieldCount === 1) {
-    const existsResult = await pool.query(
-      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-      [id, userId]
-    );
-
-    if (!existsResult.rows || existsResult.rows.length === 0) {
-      return null;
-    }
-  }
-
   updateFields.push('updated_at = NOW()');
   updateFields.push('last_viewed = NOW()');
 

@@ -5,6 +5,26 @@ image:
 
 replicaCount: 1
 
+app:
+  publicUrl: http://app.metrics-server.local
+  auth:
+    issuerUrl: http://keycloak.metrics-server.local/realms/todos
+    authorizeUrl: http://keycloak.metrics-server.local/realms/todos/protocol/openid-connect/auth
+    tokenUrl: http://keycloak.metrics-server.local/realms/todos/protocol/openid-connect/token
+    logoutUrl: http://keycloak.metrics-server.local/realms/todos/protocol/openid-connect/logout
+    redirectUri: http://app.metrics-server.local/auth/callback
+    postLogoutRedirectUri: http://app.metrics-server.local/login
+
+keycloak:
+  publicUrl: http://keycloak.metrics-server.local
+  hostname: keycloak.metrics-server.local
+  ingress:
+    enabled: true
+    host: keycloak.metrics-server.local
+    className: ""
+    annotations: {}
+    tls: []
+
 ingress:
   enabled: false
 
@@ -21,3 +41,11 @@ externalSecrets:
     remoteRef:
       key: metrics-server/staging/postgres
       property: postgres-password
+  keycloakPostgresPassword:
+    remoteRef:
+      key: metrics-server/staging/keycloak-postgres
+      property: postgres-password
+  keycloakAdminPassword:
+    remoteRef:
+      key: metrics-server/staging/keycloak
+      property: admin-password

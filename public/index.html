@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Todos</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; }
+      header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+      .muted { color: #666; }
+      .row { display: flex; gap: 12px; flex-wrap: wrap; }
+      input, select, button, textarea { padding: 8px; font: inherit; }
+      form { display: grid; gap: 12px; margin: 20px 0; }
+      ul { list-style: none; padding: 0; }
+      li { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 10px 0; }
+      .todo-title { font-weight: 600; }
+      .todo-meta { font-size: 0.9rem; color: #555; }
+      .danger { color: #b00020; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Todos</h1>
+        <div class="muted">Your personal todo list</div>
+      </div>
+      <button id="logout">Logout</button>
+    </header>
+
+    <main>
+      <section id="status" class="muted"></section>
+
+      <form id="todo-form">
+        <input id="title" name="title" placeholder="Title" required />
+        <textarea id="description" name="description" placeholder="Description"></textarea>
+        <div class="row">
+          <input id="category" name="category" placeholder="Category" />
+          <select id="status-input" name="status">
+            <option value="">pending</option>
+            <option value="pending">pending</option>
+            <option value="in_progress">in_progress</option>
+            <option value="completed">completed</option>
+          </select>
+          <select id="priority" name="priority">
+            <option value="">medium</option>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        </div>
+        <button type="submit">Add todo</button>
+      </form>
+
+      <ul id="todos"></ul>
+    </main>
+
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>

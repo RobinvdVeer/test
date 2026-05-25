@@ -1,24 +1,62 @@
 const request = require('supertest');
-const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 // Shared OpenAPI/route normalization helpers (used by scripts/check-openapi.js)
 require('../src/openapi/contractCheckHelpers');
 
 const openApiDocument = require('../openapi.json');
+const originalFetch = global.fetch;
 
 let queryMock;
 let endMock;
+let jwks;
+let privateKey;
+
+function base64UrlEncode(input) {
+  return Buffer.from(input)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function setupKeys() {
+  const pair = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  privateKey = pair.privateKey;
+  const publicJwk = pair.publicKey.export({ format: 'jwk' });
+  jwks = {
+    keys: [
+      {
+        ...publicJwk,
+        kid: 'test-key',
+        use: 'sig',
+        alg: 'RS256',
+      },
+    ],
+  };
+}
 
 function loadApp(now = '2024-01-01T00:00:00.000Z') {
   jest.resetModules();
   jest.useFakeTimers();
   jest.setSystemTime(new Date(now));
 
-  // Ensure required env vars for module initialization.
   process.env.DATABASE_URL =
     process.env.DATABASE_URL ||
     'postgresql://test:test@localhost:5432/testdb';
-  process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret';
+  process.env.KEYCLOAK_ISSUER_URL =
+    process.env.KEYCLOAK_ISSUER_URL || 'https://keycloak.local/realms/todos';
+  process.env.KEYCLOAK_JWKS_URL =
+    process.env.KEYCLOAK_JWKS_URL ||
+    'https://keycloak.local/realms/todos/protocol/openid-connect/certs';
+  process.env.KEYCLOAK_CLIENT_ID =
+    process.env.KEYCLOAK_CLIENT_ID || 'todo-app';
+
+  setupKeys();
+  global.fetch = jest.fn(async () => ({
+    ok: true,
+    json: async () => jwks,
+  }));
 
   queryMock = jest.fn();
   endMock = jest.fn((cb) => cb && cb());
@@ -30,7 +68,21 @@ function loadApp(now = '2024-01-01T00:00:00.000Z') {
 }
 
 function tokenForUser(userId) {
-  return jwt.sign({ sub: userId }, process.env.JWT_SECRET || 'test_jwt_secret');
+  const header = base64UrlEncode(JSON.stringify({ alg: 'RS256', kid: 'test-key', typ: 'JWT' }));
+  const now = Math.floor(Date.now() / 1000);
+  const payload = base64UrlEncode(
+    JSON.stringify({
+      iss: process.env.KEYCLOAK_ISSUER_URL,
+      sub: userId,
+      aud: process.env.KEYCLOAK_CLIENT_ID,
+      azp: process.env.KEYCLOAK_CLIENT_ID,
+      iat: now,
+      exp: now + 3600,
+    })
+  );
+  const signingInput = `${header}.${payload}`;
+  const signature = crypto.sign('RSA-SHA256', Buffer.from(signingInput), privateKey);
+  return `${signingInput}.${base64UrlEncode(signature)}`;
 }
 
 function authForUser(userId) {
@@ -44,6 +96,7 @@ function upsertSql() {
 afterEach(() => {
   jest.useRealTimers();
   jest.dontMock('pg');
+  global.fetch = originalFetch;
 });
 
 describe('public discovery and health endpoints', () => {
@@ -76,13 +129,53 @@ describe('public discovery and health endpoints', () => {
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  test('rejects /metrics without X-User-Id', async () => {
+  test('serves /auth-config.json with Keycloak settings', async () => {
     const app = loadApp();
 
-    await request(app)
-      .get('/metrics')
-      .expect(400, { error: 'X-User-Id header is required' });
+    const res = await request(app).get('/auth-config.json').expect(200);
 
+    expect(res.body).toEqual({
+      issuerUrl: 'https://keycloak.local/realms/todos',
+      clientId: 'todo-app',
+      authorizeUrl:
+        'https://keycloak.local/realms/todos/protocol/openid-connect/auth',
+      tokenUrl:
+        'https://keycloak.local/realms/todos/protocol/openid-connect/token',
+      logoutUrl:
+        'https://keycloak.local/realms/todos/protocol/openid-connect/logout',
+      redirectUri: 'http://localhost:3000/auth/callback',
+      postLogoutRedirectUri: 'http://localhost:3000/login',
+      scope: 'openid profile email',
+    });
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('serves the login page', async () => {
+    const app = loadApp();
+
+    const res = await request(app).get('/login').expect(200);
+
+    expect(res.type).toMatch(/html/);
+    expect(res.text).toContain('<button id="login">Login</button>');
+    expect(res.text).toContain('/assets/login.js');
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('serves the auth callback page', async () => {
+    const app = loadApp();
+
+    const res = await request(app).get('/auth/callback').expect(200);
+
+    expect(res.type).toMatch(/html/);
+    expect(res.text).toContain('Signing in…');
+    expect(res.text).toContain('/assets/callback.js');
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('serves /metrics without auth', async () => {
+    const app = loadApp();
+
+    await request(app).get('/metrics').expect(200);
     expect(queryMock).not.toHaveBeenCalled();
   });
 });
@@ -98,33 +191,44 @@ describe('protected middleware', () => {
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  test('rejects GET /todos/:id without X-User-Id before querying database', async () => {
+  test('rejects GET /todos/:id without Bearer token before querying database', async () => {
     const app = loadApp();
 
     await request(app)
       .get('/todos/7')
-      .expect(400, { error: 'X-User-Id header is required' });
+      .expect(401, { error: 'Authorization bearer token is required' });
 
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  test('rejects PUT /todos/:id without X-User-Id before querying database', async () => {
+  test('rejects PUT /todos/:id without Bearer token before querying database', async () => {
     const app = loadApp();
 
     await request(app)
       .put('/todos/7')
       .send({ title: 'x' })
-      .expect(400, { error: 'X-User-Id header is required' });
+      .expect(401, { error: 'Authorization bearer token is required' });
 
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  test('rejects DELETE /todos/:id without X-User-Id before querying database', async () => {
+  test('rejects DELETE /todos/:id without Bearer token before querying database', async () => {
     const app = loadApp();
 
     await request(app)
       .delete('/todos/7')
-      .expect(400, { error: 'X-User-Id header is required' });
+      .expect(401, { error: 'Authorization bearer token is required' });
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects invalid bearer tokens before querying database', async () => {
+    const app = loadApp();
+
+    await request(app)
+      .get('/todos')
+      .set({ Authorization: 'Bearer abc.def.ghi' })
+      .expect(401, { error: 'Invalid bearer token' });
 
     expect(queryMock).not.toHaveBeenCalled();
   });
@@ -197,7 +301,7 @@ describe('GET /todos', () => {
 
     const res = await request(app)
       .get('/todos?limit=10&offset=20')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(200);
 
     expect(res.body).toEqual(rows);
@@ -215,7 +319,7 @@ describe('GET /todos', () => {
 
     const res = await request(app)
       .get('/todos?limit=500')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(200);
 
     expect(res.body).toEqual(rows);
@@ -233,7 +337,7 @@ describe('GET /todos', () => {
 
     await request(app)
       .get('/todos?limit=-1&offset=20')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(200);
 
     expect(queryMock).toHaveBeenNthCalledWith(
@@ -250,7 +354,7 @@ describe('GET /todos', () => {
 
     await request(app)
       .get('/todos?offset=20')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(200);
 
     expect(queryMock).toHaveBeenNthCalledWith(
@@ -267,7 +371,7 @@ describe('GET /todos', () => {
 
     const res = await request(app)
       .get('/todos?limit=0')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(200);
 
     expect(res.body).toEqual(rows);
@@ -285,7 +389,7 @@ describe('GET /todos', () => {
 
     await request(app)
       .get('/todos?category=work&status=done&limit=5&offset=2&sort_by=created_asc')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(200);
 
     const [sql, params] = queryMock.mock.calls[1];
@@ -374,7 +478,7 @@ describe('POST /todos', () => {
 
     const res = await request(app)
       .post('/todos')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .send({ title: 'new', status: '' })
       .expect(201);
 
@@ -393,7 +497,7 @@ describe('POST /todos', () => {
 
     const res = await request(app)
       .post('/todos')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .send({ title: 'new', priority: null })
       .expect(201);
 
@@ -412,7 +516,7 @@ describe('POST /todos', () => {
 
     const res = await request(app)
       .post('/todos')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .send({ title: 'new', description: null, category: null, status: '', priority: '' })
       .expect(201);
 
@@ -547,53 +651,55 @@ describe('PUT /todos/:id', () => {
       .expect(500, { error: 'Internal server error' });
   });
 
-  test('returns 500 when existence-check query fails', async () => {
-    const app = loadApp();
-    queryMock
-      .mockResolvedValueOnce({ rows: [] })
-      .mockRejectedValueOnce(new Error('db down'));
-
-    await request(app)
-      .put('/todos/7')
-      .set('X-User-Id', 'u1')
-      .send({ title: 'updated' })
-      .expect(500, { error: 'Internal server error' });
-
-    expect(queryMock).toHaveBeenCalledTimes(2);
-    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['u1']);
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-      ['7', 'u1']
-    );
-  });
-
-  test('updates only provided fields when fields are omitted (not explicitly null)', async () => {
+  test('single-field updates skip the existence-check query', async () => {
     const app = loadApp();
     const row = { id: 7, title: 'updated' };
 
     queryMock
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 7 }] })
       .mockResolvedValueOnce({ rows: [row] });
 
     const res = await request(app)
       .put('/todos/7')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .send({ title: 'updated' })
       .expect(200);
 
     expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['u1']);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'UPDATE todos SET title = $1, updated_at = NOW(), last_viewed = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
+      ['updated', '7', 'u1']
+    );
+  });
 
-    const [updateSql, updateParams] = queryMock.mock.calls[2];
+  test('updates only provided fields when fields are omitted (not explicitly null)', async () => {
+    const app = loadApp();
+    const row = { id: 7, title: 'updated', category: null };
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .put('/todos/7')
+      .set(authForUser('u1'))
+      .send({ title: 'updated', category: null })
+      .expect(200);
+
+    expect(res.body).toEqual(row);
+
+    const [updateSql, updateParams] = queryMock.mock.calls[1];
     expect(updateSql).toContain('title = $1');
+    expect(updateSql).toContain('category = $2');
     expect(updateSql).not.toContain('description =');
-    expect(updateSql).not.toContain('category =');
     expect(updateSql).not.toContain('status =');
     expect(updateSql).not.toContain('priority =');
     expect(updateSql).toContain('updated_at = NOW()');
     expect(updateSql).toContain('last_viewed = NOW()');
-    expect(updateParams).toEqual(['updated', '7', 'u1']);
+    expect(updateParams).toEqual(['updated', null, '7', 'u1']);
   });
 });
 

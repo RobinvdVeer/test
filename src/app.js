@@ -1,17 +1,22 @@
 const express = require('express');
+const path = require('path');
 const bodyParser = require('body-parser');
 const openApiDocument = require('../openapi.json');
-const { userMiddleware } = require('./middleware/user');
+const { getConfig } = require('./config');
+const { authMiddleware } = require('./middleware/user');
+const { ensureUserMiddleware } = require('./middleware/ensure-user');
 const { registerMetricsRoutes } = require('./routes/metrics');
 const { registerTodosRoutes } = require('./routes/todos');
 
 function createApp() {
   const app = express();
   const startTime = Date.now();
+  const config = getConfig();
+  const publicDir = path.join(__dirname, '..', 'public');
 
   app.use(bodyParser.json({ limit: '1mb' }));
+  app.use('/assets', express.static(path.join(publicDir, 'assets')));
 
-  // Public endpoints used by gateways, health probes, and API discovery.
   app.get('/openapi.json', (req, res) => {
     res.json(openApiDocument);
   });
@@ -20,18 +25,38 @@ function createApp() {
     res.json(openApiDocument);
   });
 
+  app.get('/auth-config.json', (req, res) => {
+    res.json({
+      issuerUrl: config.auth.issuerUrl,
+      clientId: config.auth.clientId,
+      authorizeUrl: config.auth.authorizeUrl,
+      tokenUrl: config.auth.tokenUrl,
+      logoutUrl: config.auth.logoutUrl,
+      redirectUri: config.auth.redirectUri,
+      postLogoutRedirectUri: config.auth.postLogoutRedirectUri,
+      scope: config.auth.scope,
+    });
+  });
+
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
   });
 
-  // Remaining API requires identification.
-  app.use(userMiddleware);
+  app.get('/login', (req, res) => {
+    res.sendFile(path.join(publicDir, 'login.html'));
+  });
 
-  // /metrics
+  app.get('/auth/callback', (req, res) => {
+    res.sendFile(path.join(publicDir, 'auth', 'callback.html'));
+  });
+
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(publicDir, 'index.html'));
+  });
+
   registerMetricsRoutes(app, startTime);
 
-  // /todos
-  app.use('/todos', registerTodosRoutes());
+  app.use('/todos', authMiddleware, ensureUserMiddleware, registerTodosRoutes());
 
   return app;
 }
