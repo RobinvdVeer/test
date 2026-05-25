@@ -651,34 +651,12 @@ describe('PUT /todos/:id', () => {
       .expect(500, { error: 'Internal server error' });
   });
 
-  test('returns 500 when existence-check query fails', async () => {
-    const app = loadApp();
-    queryMock
-      .mockResolvedValueOnce({ rows: [] })
-      .mockRejectedValueOnce(new Error('db down'));
-
-    await request(app)
-      .put('/todos/7')
-      .set(authForUser('u1'))
-      .send({ title: 'updated' })
-      .expect(500, { error: 'Internal server error' });
-
-    expect(queryMock).toHaveBeenCalledTimes(2);
-    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['u1']);
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-      ['7', 'u1']
-    );
-  });
-
-  test('updates only provided fields when fields are omitted (not explicitly null)', async () => {
+  test('single-field updates skip the existence-check query', async () => {
     const app = loadApp();
     const row = { id: 7, title: 'updated' };
 
     queryMock
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 7 }] })
       .mockResolvedValueOnce({ rows: [row] });
 
     const res = await request(app)
@@ -688,16 +666,40 @@ describe('PUT /todos/:id', () => {
       .expect(200);
 
     expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['u1']);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'UPDATE todos SET title = $1, updated_at = NOW(), last_viewed = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
+      ['updated', '7', 'u1']
+    );
+  });
 
-    const [updateSql, updateParams] = queryMock.mock.calls[2];
+  test('updates only provided fields when fields are omitted (not explicitly null)', async () => {
+    const app = loadApp();
+    const row = { id: 7, title: 'updated', category: null };
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .put('/todos/7')
+      .set(authForUser('u1'))
+      .send({ title: 'updated', category: null })
+      .expect(200);
+
+    expect(res.body).toEqual(row);
+
+    const [updateSql, updateParams] = queryMock.mock.calls[1];
     expect(updateSql).toContain('title = $1');
+    expect(updateSql).toContain('category = $2');
     expect(updateSql).not.toContain('description =');
-    expect(updateSql).not.toContain('category =');
     expect(updateSql).not.toContain('status =');
     expect(updateSql).not.toContain('priority =');
     expect(updateSql).toContain('updated_at = NOW()');
     expect(updateSql).toContain('last_viewed = NOW()');
-    expect(updateParams).toEqual(['updated', '7', 'u1']);
+    expect(updateParams).toEqual(['updated', null, '7', 'u1']);
   });
 });
 
