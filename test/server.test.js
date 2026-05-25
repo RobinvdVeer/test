@@ -1,6 +1,9 @@
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 
+// Shared OpenAPI/route normalization helpers (used by scripts/check-openapi.js)
+require('../src/openapi/contractCheckHelpers');
+
 let queryMock;
 let endMock;
 
@@ -282,7 +285,7 @@ describe('PUT /todos/:id', () => {
 
   test('rejects an empty update body', async () => {
     const app = loadApp();
-    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 7 }] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
 
     await request(app)
       .put('/todos/7')
@@ -290,15 +293,15 @@ describe('PUT /todos/:id', () => {
       .send({})
       .expect(400, { error: 'No fields to update' });
 
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(1);
   });
 
   test('updates only provided fields and permits nullable fields', async () => {
     const app = loadApp();
     const row = { id: 7, title: 'updated', description: null, category: null };
+
     queryMock
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 7 }] })
       .mockResolvedValueOnce({ rows: [row] });
 
     const res = await request(app)
@@ -310,11 +313,6 @@ describe('PUT /todos/:id', () => {
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-      ['7', 'u1']
-    );
-    expect(queryMock).toHaveBeenNthCalledWith(
-      3,
       'UPDATE todos SET title = $1, description = $2, category = $3, updated_at = NOW(), last_viewed = NOW() WHERE id = $4 AND user_id = $5 RETURNING *',
       ['updated', null, null, '7', 'u1']
     );
@@ -324,7 +322,6 @@ describe('PUT /todos/:id', () => {
     const app = loadApp();
     queryMock
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 7 }] })
       .mockRejectedValueOnce(new Error('fail'));
 
     await request(app)

@@ -96,16 +96,6 @@ async function getTodoAndUpdateLastViewed(userId, id) {
 }
 
 async function updateTodo(userId, id, { title, description, category, status, priority }) {
-  // First, check if todo exists and belongs to user
-  const checkResult = await pool.query(
-    'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-    [id, userId]
-  );
-
-  if (checkResult.rows.length === 0) {
-    return null;
-  }
-
   // Update only provided fields
   const updateFields = [];
   const updateValues = [];
@@ -139,11 +129,13 @@ async function updateTodo(userId, id, { title, description, category, status, pr
 
   updateFields.push('updated_at = NOW()');
   updateFields.push('last_viewed = NOW()');
-  updateValues.push(id, userId);
 
   const query = `UPDATE todos SET ${updateFields.join(
     ', '
   )} WHERE id = $${paramCount++} AND user_id = $${paramCount++} RETURNING *`;
+
+  // Append WHERE-clause args at the end.
+  updateValues.push(id, userId);
 
   const result = await pool.query(query, updateValues);
   return result.rows[0] || null;
