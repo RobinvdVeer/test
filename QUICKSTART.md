@@ -182,7 +182,7 @@ docker-compose logs postgres
 
 Check server uptime and resource usage:
 ```bash
-curl http://localhost:3000/metrics | jq
+curl -H "X-User-Id: user123" http://localhost:3000/metrics | jq
 ```
 
 ## Stop the Application

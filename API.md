@@ -25,7 +25,7 @@ npm start
 ```
 
 ## Authentication
-Todo requests require the `X-User-Id` header. Public endpoints (`/health`, `/metrics`, `/openapi.json`, and `/api/docs/openapi.json`) do not require it:
+Todo requests require the `X-User-Id` header. Public endpoints (`/health`, `/openapi.json`, and `/api/docs/openapi.json`) do not require it:
 ```
 X-User-Id: your-unique-user-id
 ```
