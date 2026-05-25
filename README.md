@@ -40,10 +40,17 @@ Open:
 - `DELETE /todos/:id` – delete todo
 
 ## Environment
+See `.env.example` for the full local Docker Compose configuration.
+
 - `DATABASE_URL`
 - `POSTGRES_USER`
 - `POSTGRES_DB`
 - `POSTGRES_PASSWORD`
+- `KEYCLOAK_POSTGRES_USER`
+- `KEYCLOAK_POSTGRES_DB`
+- `KEYCLOAK_POSTGRES_PASSWORD`
+- `KEYCLOAK_ADMIN`
+- `KEYCLOAK_ADMIN_PASSWORD`
 - `KEYCLOAK_ISSUER_URL`
 - `KEYCLOAK_JWKS_URL`
 - `KEYCLOAK_CLIENT_ID`
