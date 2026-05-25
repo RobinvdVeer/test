@@ -71,7 +71,7 @@ describe('helm chart deployability conventions', () => {
 
     expect(appDeployment.spec.template.spec.containers[0].image).toBe('example.test/app:abc123');
     expect(appDeployment.spec.template.spec.containers[0].env).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: 'KEYCLOAK_ISSUER_URL', value: 'http://localhost:8081/realms/todos' }),
+      expect.objectContaining({ name: 'KEYCLOAK_ISSUER_URL', value: 'http://keycloak.metrics-server.local/realms/todos' }),
       expect.objectContaining({ name: 'KEYCLOAK_JWKS_URL' }),
       expect.objectContaining({ name: 'KEYCLOAK_CLIENT_ID', value: 'todo-app' }),
     ]));
