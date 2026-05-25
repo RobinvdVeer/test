@@ -1,4 +1,5 @@
 const request = require('supertest');
+const openApiDocument = require('../openapi.json');
 
 let queryMock;
 let endMock;
@@ -45,9 +46,7 @@ describe('public discovery and health endpoints', () => {
     const res = await request(app).get('/api/docs/openapi.json').expect(200);
 
     expect(res.type).toMatch(/json/);
-    expect(res.body.openapi).toMatch(/^3\./);
-    expect(res.body.paths['/api/docs/openapi.json']).toBeDefined();
-    expect(res.body.paths['/metrics']).toBeDefined();
+    expect(res.body).toEqual(openApiDocument);
     expect(queryMock).not.toHaveBeenCalled();
   });
 
@@ -55,6 +54,16 @@ describe('public discovery and health endpoints', () => {
     const app = loadApp();
 
     await request(app).get('/health').expect(200, { status: 'ok' });
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects /metrics without X-User-Id', async () => {
+    const app = loadApp();
+
+    await request(app)
+      .get('/metrics')
+      .expect(400, { error: 'X-User-Id header is required' });
+
     expect(queryMock).not.toHaveBeenCalled();
   });
 });
@@ -65,6 +74,37 @@ describe('protected middleware', () => {
 
     await request(app)
       .get('/todos')
+      .expect(400, { error: 'X-User-Id header is required' });
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects GET /todos/:id without X-User-Id before querying database', async () => {
+    const app = loadApp();
+
+    await request(app)
+      .get('/todos/7')
+      .expect(400, { error: 'X-User-Id header is required' });
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects PUT /todos/:id without X-User-Id before querying database', async () => {
+    const app = loadApp();
+
+    await request(app)
+      .put('/todos/7')
+      .send({ title: 'x' })
+      .expect(400, { error: 'X-User-Id header is required' });
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects DELETE /todos/:id without X-User-Id before querying database', async () => {
+    const app = loadApp();
+
+    await request(app)
+      .delete('/todos/7')
       .expect(400, { error: 'X-User-Id header is required' });
 
     expect(queryMock).not.toHaveBeenCalled();
@@ -110,7 +150,7 @@ describe('GET /todos', () => {
     expect(res.body).toEqual(rows);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC',
+      expect.stringContaining('FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC'),
       ['u1']
     );
   });
@@ -129,6 +169,113 @@ describe('GET /todos', () => {
       'SELECT * FROM todos WHERE user_id = $1 AND category = $2 AND status = $3 ORDER BY last_viewed DESC',
       ['u1', 'work', 'done']
     );
+  });
+
+  test('supports limit and offset with stable placeholder ordering', async () => {
+    const app = loadApp();
+    const rows = [{ id: 1, title: 'a' }];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    const res = await request(app)
+      .get('/todos?limit=10&offset=20')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    expect(res.body).toEqual(rows);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
+      ['u1', 10, 20]
+    );
+  });
+
+  test('caps limit at 100 and applies OFFSET=0 when offset is omitted', async () => {
+    const app = loadApp();
+    const rows = [{ id: 1, title: 'a' }];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    const res = await request(app)
+      .get('/todos?limit=500')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    expect(res.body).toEqual(rows);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
+      ['u1', 100, 0]
+    );
+  });
+
+  test('ignores limit/offset when limit is negative', async () => {
+    const app = loadApp();
+    const rows = [{ id: 1, title: 'a' }];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    await request(app)
+      .get('/todos?limit=-1&offset=20')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC',
+      ['u1']
+    );
+  });
+
+  test('ignores offset when offset is provided without a valid limit', async () => {
+    const app = loadApp();
+    const rows = [{ id: 1, title: 'a' }];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    await request(app)
+      .get('/todos?offset=20')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC',
+      ['u1']
+    );
+  });
+
+  test('applies LIMIT 0 when limit=0', async () => {
+    const app = loadApp();
+    const rows = [];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    const res = await request(app)
+      .get('/todos?limit=0')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    expect(res.body).toEqual(rows);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
+      ['u1', 0, 0]
+    );
+  });
+
+  test('keeps SQL placeholder ordering correct for filters + pagination + sort', async () => {
+    const app = loadApp();
+    const rows = [{ id: 1, title: 'a' }];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    await request(app)
+      .get('/todos?category=work&status=done&limit=5&offset=2&sort_by=created_asc')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    const [sql, params] = queryMock.mock.calls[1];
+    expect(sql).toContain('category = $2');
+    expect(sql).toContain('status = $3');
+    expect(sql).toContain('ORDER BY created_at ASC');
+    expect(sql).toContain('LIMIT $4');
+    expect(sql).toContain('OFFSET $5');
+    expect(params).toEqual(['u1', 'work', 'done', 5, 2]);
   });
 
   test.each([
@@ -189,6 +336,63 @@ describe('POST /todos', () => {
       .post('/todos')
       .set('X-User-Id', 'u1')
       .send({ title: 'new' })
+      .expect(201);
+
+    expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium']
+    );
+  });
+
+  test('uses default status when status is an empty string', async () => {
+    const app = loadApp();
+    const row = { id: 1, title: 'new', status: 'pending', priority: 'medium' };
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .post('/todos')
+      .set('X-User-Id', 'u1')
+      .send({ title: 'new', status: '' })
+      .expect(201);
+
+    expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium']
+    );
+  });
+
+  test('uses default priority when priority is null', async () => {
+    const app = loadApp();
+    const row = { id: 1, title: 'new', status: 'pending', priority: 'medium' };
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .post('/todos')
+      .set('X-User-Id', 'u1')
+      .send({ title: 'new', priority: null })
+      .expect(201);
+
+    expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium']
+    );
+  });
+
+  test('preserves explicit nulls for description/category while applying defaults for falsy status/priority', async () => {
+    const app = loadApp();
+    const row = { id: 1, title: 'new', status: 'pending', priority: 'medium', description: null, category: null };
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .post('/todos')
+      .set('X-User-Id', 'u1')
+      .send({ title: 'new', description: null, category: null, status: '', priority: '' })
       .expect(201);
 
     expect(res.body).toEqual(row);
@@ -312,6 +516,55 @@ describe('PUT /todos/:id', () => {
       .set('X-User-Id', 'u1')
       .send({ title: 'updated' })
       .expect(500, { error: 'Internal server error' });
+  });
+
+  test('returns 500 when existence-check query fails', async () => {
+    const app = loadApp();
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error('db down'));
+
+    await request(app)
+      .put('/todos/7')
+      .set('X-User-Id', 'u1')
+      .send({ title: 'updated' })
+      .expect(500, { error: 'Internal server error' });
+
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['u1']);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
+      ['7', 'u1']
+    );
+  });
+
+  test('updates only provided fields when fields are omitted (not explicitly null)', async () => {
+    const app = loadApp();
+    const row = { id: 7, title: 'updated' };
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 7 }] })
+      .mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .put('/todos/7')
+      .set('X-User-Id', 'u1')
+      .send({ title: 'updated' })
+      .expect(200);
+
+    expect(res.body).toEqual(row);
+
+    const [updateSql, updateParams] = queryMock.mock.calls[2];
+    expect(updateSql).toContain('title = $1');
+    expect(updateSql).not.toContain('description =');
+    expect(updateSql).not.toContain('category =');
+    expect(updateSql).not.toContain('status =');
+    expect(updateSql).not.toContain('priority =');
+    expect(updateSql).toContain('updated_at = NOW()');
+    expect(updateSql).toContain('last_viewed = NOW()');
+    expect(updateParams).toEqual(['updated', '7', 'u1']);
   });
 });
 

@@ -1,6 +1,7 @@
 const request = require('supertest');
 const SwaggerParser = require('@apidevtools/swagger-parser');
 const openApiDocument = require('../openapi.json');
+const { execFileSync } = require('child_process');
 
 let queryMock;
 
@@ -40,4 +41,8 @@ test('served /openapi.json matches committed openapi.json', async () => {
 
   expect(res.body).toEqual(openApiDocument);
   expect(queryMock).not.toHaveBeenCalled();
+});
+
+test('scripts/check-openapi.js contract check passes', () => {
+  execFileSync('node', ['scripts/check-openapi.js'], { stdio: 'ignore' });
 });
