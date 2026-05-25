@@ -1,6 +1,6 @@
 const { pool } = require('../db/pool');
 
-async function listTodos(userId, { category, status, sort_by }) {
+async function listTodos(userId, { category, status, sort_by, limit, offset }) {
   let query = 'SELECT * FROM todos WHERE user_id = $1';
   const params = [userId];
   let paramCount = 1;
@@ -16,6 +16,16 @@ async function listTodos(userId, { category, status, sort_by }) {
     query += ` AND status = $${paramCount}`;
     params.push(status);
   }
+
+  const parseOptionalNonNegativeInt = (v) => {
+    if (v === undefined || v === null) return null;
+    const n = Number.parseInt(v, 10);
+    if (!Number.isSafeInteger(n) || n < 0) return null;
+    return n;
+  };
+
+  const requestedLimit = parseOptionalNonNegativeInt(limit);
+  const requestedOffset = parseOptionalNonNegativeInt(offset);
 
   // Default sort by last_viewed (most recently viewed first)
   const sortOption = sort_by || 'last_viewed_desc';
@@ -40,6 +50,19 @@ async function listTodos(userId, { category, status, sort_by }) {
       query += ' ORDER BY last_viewed DESC';
   }
 
+  // Apply optional pagination only when a valid limit is provided.
+  const applyLimit = requestedLimit !== null;
+  if (applyLimit) {
+    paramCount += 1;
+    query += ` LIMIT $${paramCount}`;
+    params.push(Math.min(requestedLimit, 100));
+
+    // OFFSET is only meaningful when LIMIT is set.
+    paramCount += 1;
+    query += ` OFFSET $${paramCount}`;
+    params.push(requestedOffset ?? 0);
+  }
+
   const result = await pool.query(query, params);
   return result.rows;
 }
@@ -62,7 +85,19 @@ async function createTodo(userId, { title, description, category, status, priori
 
 async function getTodoAndUpdateLastViewed(userId, id) {
   const result = await pool.query(
-    'UPDATE todos SET last_viewed = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
+    `WITH selected AS (
+       SELECT * FROM todos WHERE id = $1 AND user_id = $2
+     ), updated AS (
+       UPDATE todos
+       SET last_viewed = NOW()
+       WHERE id = $1
+         AND user_id = $2
+         AND last_viewed < NOW() - INTERVAL '5 minutes'
+       RETURNING *
+     )
+     SELECT * FROM updated
+     UNION ALL
+     SELECT * FROM selected WHERE NOT EXISTS (SELECT 1 FROM updated)`,
     [id, userId]
   );
 

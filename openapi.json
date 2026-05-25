@@ -88,7 +88,9 @@
           { "$ref": "#/components/parameters/UserIdHeader" },
           { "name": "category", "in": "query", "schema": { "type": "string" } },
           { "name": "status", "in": "query", "schema": { "type": "string" } },
-          { "name": "sort_by", "in": "query", "schema": { "type": "string", "enum": ["created_asc", "created_desc", "updated_asc", "updated_desc", "last_viewed_asc", "last_viewed_desc"] } }
+          { "name": "sort_by", "in": "query", "schema": { "type": "string", "enum": ["created_asc", "created_desc", "updated_asc", "updated_desc", "last_viewed_asc", "last_viewed_desc"] } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }
         ],
         "responses": { "200": { "description": "Todo list", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Todo" } } } } }, "500": { "$ref": "#/components/responses/ServerError" } }
       },

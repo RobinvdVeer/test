@@ -13,8 +13,14 @@ function registerTodosRoutes() {
   // GET /todos - List all todos for the user with optional filtering
   router.get('/', async (req, res) => {
     try {
-      const { category, status, sort_by } = req.query;
-      const result = await listTodos(req.userId, { category, status, sort_by });
+      const { category, status, sort_by, limit, offset } = req.query;
+      const result = await listTodos(req.userId, {
+        category,
+        status,
+        sort_by,
+        limit,
+        offset,
+      });
       res.json(result);
     } catch (error) {
       console.error('Error fetching todos:', error);
