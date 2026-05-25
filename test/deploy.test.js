@@ -75,10 +75,52 @@ describe('helm chart deployability conventions', () => {
     expect(postgresSecret.stringData['postgres-password']).toBe('pass');
   });
 
+  maybeTest('renders ExternalSecret resources with apiVersion from values', () => {
+    const rendered = execFileSync('helm', [
+      'template', 'test', 'deploy/chart',
+      '--set', 'externalSecrets.enabled=true',
+      '--set', 'externalSecrets.apiVersion=external-secrets.io/v1alpha1'
+    ], { encoding: 'utf8' });
+
+    const docs = yaml.loadAll(rendered).filter(Boolean);
+
+    const databaseExtSecret = docs.find((doc) => doc.kind === 'ExternalSecret' && doc.metadata.name === 'test-database');
+    const postgresExtSecret = docs.find((doc) => doc.kind === 'ExternalSecret' && doc.metadata.name === 'test-postgres');
+
+    expect(databaseExtSecret.apiVersion).toBe('external-secrets.io/v1alpha1');
+    expect(databaseExtSecret.spec.target.name).toBe('metrics-server-database');
+    expect(databaseExtSecret.spec.data[0].remoteRef.key).toBe('metrics-server/database');
+    expect(databaseExtSecret.spec.data[0].remoteRef.property).toBe('database-url');
+
+    expect(postgresExtSecret.apiVersion).toBe('external-secrets.io/v1alpha1');
+    expect(postgresExtSecret.spec.target.name).toBe('metrics-server-postgres');
+    expect(postgresExtSecret.spec.data[0].remoteRef.key).toBe('metrics-server/postgres');
+    expect(postgresExtSecret.spec.data[0].remoteRef.property).toBe('postgres-password');
+  });
+
+  maybeTest('renders ExternalSecret resources using the staging override values', () => {
+    const rendered = execFileSync('helm', ['template', 'test', 'deploy/chart', '-f', 'deploy/values-staging.yaml'], { encoding: 'utf8' });
+    const docs = yaml.loadAll(rendered).filter(Boolean);
+
+    const databaseExtSecret = docs.find((doc) => doc.kind === 'ExternalSecret' && doc.metadata.name === 'test-database');
+    const postgresExtSecret = docs.find((doc) => doc.kind === 'ExternalSecret' && doc.metadata.name === 'test-postgres');
+
+    expect(databaseExtSecret.apiVersion).toBe('external-secrets.io/v1alpha1');
+    expect(databaseExtSecret.spec.target.name).toBe('metrics-server-database');
+    expect(databaseExtSecret.spec.data[0].remoteRef.key).toBe('metrics-server/staging/database');
+    expect(databaseExtSecret.spec.data[0].remoteRef.property).toBe('database-url');
+
+    expect(postgresExtSecret.apiVersion).toBe('external-secrets.io/v1alpha1');
+    expect(postgresExtSecret.spec.target.name).toBe('metrics-server-postgres');
+    expect(postgresExtSecret.spec.data[0].remoteRef.key).toBe('metrics-server/staging/postgres');
+    expect(postgresExtSecret.spec.data[0].remoteRef.property).toBe('postgres-password');
+  });
+
   maybeTest('does not render secrets by default', () => {
     const rendered = execFileSync('helm', ['template', 'test', 'deploy/chart'], { encoding: 'utf8' });
     const docs = yaml.loadAll(rendered).filter(Boolean);
 
     expect(docs.some((doc) => doc.kind === 'Secret')).toBe(false);
+    expect(docs.some((doc) => doc.kind === 'ExternalSecret')).toBe(false);
   });
 });
