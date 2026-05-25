@@ -43,11 +43,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.app.database.secretName }}
                   key: {{ .Values.app.database.secretKey }}
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.app.jwt.secretName }}
-                  key: {{ .Values.app.jwt.secretKey }}
+
           readinessProbe:
             httpGet:
               path: /health

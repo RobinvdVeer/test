@@ -1,14 +1,22 @@
 const request = require('supertest');
 const SwaggerParser = require('@apidevtools/swagger-parser');
 const openApiDocument = require('../openapi.json');
+const { execFileSync } = require('child_process');
 
 let queryMock;
 
 function loadApp() {
   jest.resetModules();
+
+  // Ensure required env vars for module initialization.
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ||
+    'postgresql://test:test@localhost:5432/testdb';
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret';
+
   queryMock = jest.fn();
   jest.doMock('pg', () => ({
-    Pool: jest.fn(() => ({ query: queryMock, end: jest.fn() }))
+    Pool: jest.fn(() => ({ query: queryMock, end: jest.fn() })),
   }));
   return require('../server').app;
 }
@@ -40,4 +48,8 @@ test('served /openapi.json matches committed openapi.json', async () => {
 
   expect(res.body).toEqual(openApiDocument);
   expect(queryMock).not.toHaveBeenCalled();
+});
+
+test('scripts/check-openapi.js contract check passes', () => {
+  execFileSync('node', ['scripts/check-openapi.js'], { stdio: 'ignore' });
 });

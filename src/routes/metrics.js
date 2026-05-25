@@ -13,22 +13,37 @@ function formatUptime(seconds) {
   return parts.join(' ');
 }
 
-function registerMetricsRoutes(router, startTime) {
-  // /metrics endpoint that returns process uptime
-  router.get('/metrics', (req, res) => {
-    const uptime = (Date.now() - startTime) / 1000; // uptime in seconds
+function registerMetricsRoutes(app, startTime) {
+  // Metrics are polled frequently, so cache expensive process calls.
+  const CACHE_INTERVAL_MS = 1000;
+  let cachedPayload = null;
+  let cachedAtMs = 0;
 
-    res.json({
+  app.get('/metrics', (req, res) => {
+    const nowMs = Date.now();
+
+    if (cachedPayload && nowMs - cachedAtMs < CACHE_INTERVAL_MS) {
+      return res.json(cachedPayload);
+    }
+
+    const uptime = (nowMs - startTime) / 1000; // uptime in seconds
+
+    const payload = {
       uptime: uptime,
       uptime_seconds: Math.floor(uptime),
       uptime_readable: formatUptime(uptime),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(nowMs).toISOString(),
       process: {
         pid: process.pid,
         memory: process.memoryUsage(),
         cpu: process.cpuUsage(),
       },
-    });
+    };
+
+    cachedPayload = payload;
+    cachedAtMs = nowMs;
+
+    res.json(payload);
   });
 }
 

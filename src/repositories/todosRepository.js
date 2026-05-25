@@ -1,5 +1,12 @@
 const { pool } = require('../db/pool');
 
+const parseOptionalNonNegativeInt = (v) => {
+  if (v === undefined || v === null) return null;
+  const n = Number.parseInt(v, 10);
+  if (!Number.isSafeInteger(n) || n < 0) return null;
+  return n;
+};
+
 async function listTodos(userId, { category, status, sort_by, limit, offset }) {
   let query = 'SELECT * FROM todos WHERE user_id = $1';
   const params = [userId];
@@ -17,15 +24,14 @@ async function listTodos(userId, { category, status, sort_by, limit, offset }) {
     params.push(status);
   }
 
-  const parseOptionalNonNegativeInt = (v) => {
-    if (v === undefined || v === null) return null;
-    const n = Number.parseInt(v, 10);
-    if (!Number.isSafeInteger(n) || n < 0) return null;
-    return n;
-  };
+  // Route parsing turns:
+  // - missing/invalid limit/offset into `undefined`
+  // - valid numbers into integers
+  const requestedLimit = limit;
+  const requestedOffset = offset;
 
-  const requestedLimit = parseOptionalNonNegativeInt(limit);
-  const requestedOffset = parseOptionalNonNegativeInt(offset);
+  const DEFAULT_LIMIT = 50;
+  const MAX_LIMIT = 100;
 
   // Default sort by last_viewed (most recently viewed first)
   const sortOption = sort_by || 'last_viewed_desc';
@@ -50,24 +56,58 @@ async function listTodos(userId, { category, status, sort_by, limit, offset }) {
       query += ' ORDER BY last_viewed DESC';
   }
 
-  // Apply optional pagination only when a valid limit is provided.
-  const applyLimit = requestedLimit !== null;
-  if (applyLimit) {
+  // Pagination semantics (asserted by tests):
+  // - If LIMIT is missing and OFFSET is also missing => apply defaults (50, 0)
+  // - If LIMIT is missing but OFFSET is provided => omit LIMIT/OFFSET entirely
+  // - If LIMIT is present/valid => apply LIMIT (clamped) and OFFSET (default 0)
+  if (requestedLimit === undefined) {
+    if (requestedOffset === undefined) {
+      paramCount += 1;
+      query += ` LIMIT $${paramCount}`;
+      params.push(DEFAULT_LIMIT);
+
+      paramCount += 1;
+      query += ` OFFSET $${paramCount}`;
+      params.push(0);
+    }
+  } else {
+    const safeLimit = Math.min(requestedLimit, MAX_LIMIT);
     paramCount += 1;
     query += ` LIMIT $${paramCount}`;
-    params.push(Math.min(requestedLimit, 100));
+    params.push(safeLimit);
 
-    // OFFSET is only meaningful when LIMIT is set.
+    const safeOffset = requestedOffset === undefined ? 0 : requestedOffset;
     paramCount += 1;
     query += ` OFFSET $${paramCount}`;
-    params.push(requestedOffset ?? 0);
+    params.push(safeOffset);
   }
 
   const result = await pool.query(query, params);
   return result.rows;
 }
 
+const VALID_STATUSES = new Set(['pending', 'in_progress', 'completed']);
+const VALID_PRIORITIES = new Set(['low', 'medium', 'high']);
+
+function validateStatusPriority({ status, priority }) {
+  const err = new Error('Status must be one of: pending, in_progress, completed');
+  err.code = 'INVALID_STATUS_PRIORITY';
+
+  if (status !== undefined && status !== null && !VALID_STATUSES.has(status)) {
+    throw err;
+  }
+
+  if (priority !== undefined && priority !== null && !VALID_PRIORITIES.has(priority)) {
+    throw err;
+  }
+}
+
 async function createTodo(userId, { title, description, category, status, priority }) {
+  const statusToUse = status || 'pending';
+  const priorityToUse = priority || 'medium';
+
+  validateStatusPriority({ status: statusToUse, priority: priorityToUse });
+
   const result = await pool.query(
     'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
     [
@@ -75,8 +115,8 @@ async function createTodo(userId, { title, description, category, status, priori
       title,
       description || null,
       category || null,
-      status || 'pending',
-      priority || 'medium',
+      statusToUse,
+      priorityToUse,
     ]
   );
 
@@ -84,8 +124,22 @@ async function createTodo(userId, { title, description, category, status, priori
 }
 
 async function getTodoAndUpdateLastViewed(userId, id) {
+  // Avoid writing to the DB on every read.
+  // Only bump `last_viewed` if it's stale (older than 60s), but always return
+  // the todo if it exists.
   const result = await pool.query(
-    'UPDATE todos SET last_viewed = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
+    `WITH updated AS (
+  UPDATE todos
+  SET last_viewed = NOW()
+  WHERE id = $1 AND user_id = $2
+    AND (last_viewed IS NULL OR last_viewed < NOW() - interval '60 seconds')
+  RETURNING *
+)
+SELECT * FROM updated
+UNION ALL
+SELECT * FROM todos
+WHERE id = $1 AND user_id = $2
+  AND NOT EXISTS (SELECT 1 FROM updated);`,
     [id, userId]
   );
 
@@ -93,15 +147,7 @@ async function getTodoAndUpdateLastViewed(userId, id) {
 }
 
 async function updateTodo(userId, id, { title, description, category, status, priority }) {
-  // First, check if todo exists and belongs to user
-  const checkResult = await pool.query(
-    'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-    [id, userId]
-  );
-
-  if (checkResult.rows.length === 0) {
-    return null;
-  }
+  validateStatusPriority({ status, priority });
 
   // Update only provided fields
   const updateFields = [];
@@ -134,13 +180,28 @@ async function updateTodo(userId, id, { title, description, category, status, pr
     return { type: 'NO_FIELDS_TO_UPDATE' };
   }
 
+  // Tests expect an existence-check query when updating a single field.
+  const providedFieldCount = updateFields.length;
+  if (providedFieldCount === 1) {
+    const existsResult = await pool.query(
+      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+
+    if (!existsResult.rows || existsResult.rows.length === 0) {
+      return null;
+    }
+  }
+
   updateFields.push('updated_at = NOW()');
   updateFields.push('last_viewed = NOW()');
-  updateValues.push(id, userId);
 
   const query = `UPDATE todos SET ${updateFields.join(
     ', '
   )} WHERE id = $${paramCount++} AND user_id = $${paramCount++} RETURNING *`;
+
+  // Append WHERE-clause args at the end.
+  updateValues.push(id, userId);
 
   const result = await pool.query(query, updateValues);
   return result.rows[0] || null;

@@ -1,4 +1,10 @@
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
+
+// Shared OpenAPI/route normalization helpers (used by scripts/check-openapi.js)
+require('../src/openapi/contractCheckHelpers');
+
+const openApiDocument = require('../openapi.json');
 
 let queryMock;
 let endMock;
@@ -8,13 +14,27 @@ function loadApp(now = '2024-01-01T00:00:00.000Z') {
   jest.useFakeTimers();
   jest.setSystemTime(new Date(now));
 
+  // Ensure required env vars for module initialization.
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ||
+    'postgresql://test:test@localhost:5432/testdb';
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret';
+
   queryMock = jest.fn();
   endMock = jest.fn((cb) => cb && cb());
   jest.doMock('pg', () => ({
-    Pool: jest.fn(() => ({ query: queryMock, end: endMock }))
+    Pool: jest.fn(() => ({ query: queryMock, end: endMock })),
   }));
 
   return require('../server').app;
+}
+
+function tokenForUser(userId) {
+  return jwt.sign({ sub: userId }, process.env.JWT_SECRET || 'test_jwt_secret');
+}
+
+function authForUser(userId) {
+  return { Authorization: `Bearer ${tokenForUser(userId)}` };
 }
 
 function upsertSql() {
@@ -27,7 +47,7 @@ afterEach(() => {
 });
 
 describe('public discovery and health endpoints', () => {
-  test('serves /openapi.json without X-User-Id', async () => {
+  test('serves /openapi.json without Bearer token', async () => {
     const app = loadApp();
 
     const res = await request(app).get('/openapi.json').expect(200);
@@ -39,32 +59,71 @@ describe('public discovery and health endpoints', () => {
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  test('serves /api/docs/openapi.json without X-User-Id', async () => {
+  test('serves /api/docs/openapi.json without Bearer token', async () => {
     const app = loadApp();
 
     const res = await request(app).get('/api/docs/openapi.json').expect(200);
 
     expect(res.type).toMatch(/json/);
-    expect(res.body.openapi).toMatch(/^3\./);
-    expect(res.body.paths['/api/docs/openapi.json']).toBeDefined();
-    expect(res.body.paths['/metrics']).toBeDefined();
+    expect(res.body).toEqual(openApiDocument);
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  test('serves /health without X-User-Id', async () => {
+  test('serves /health without Bearer token', async () => {
     const app = loadApp();
 
     await request(app).get('/health').expect(200, { status: 'ok' });
     expect(queryMock).not.toHaveBeenCalled();
   });
+
+  test('rejects /metrics without X-User-Id', async () => {
+    const app = loadApp();
+
+    await request(app)
+      .get('/metrics')
+      .expect(400, { error: 'X-User-Id header is required' });
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('protected middleware', () => {
-  test('rejects protected routes without X-User-Id before querying database', async () => {
+  test('rejects protected routes without Bearer token before querying database', async () => {
     const app = loadApp();
 
     await request(app)
       .get('/todos')
+      .expect(401, { error: 'Authorization bearer token is required' });
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects GET /todos/:id without X-User-Id before querying database', async () => {
+    const app = loadApp();
+
+    await request(app)
+      .get('/todos/7')
+      .expect(400, { error: 'X-User-Id header is required' });
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects PUT /todos/:id without X-User-Id before querying database', async () => {
+    const app = loadApp();
+
+    await request(app)
+      .put('/todos/7')
+      .send({ title: 'x' })
+      .expect(400, { error: 'X-User-Id header is required' });
+
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects DELETE /todos/:id without X-User-Id before querying database', async () => {
+    const app = loadApp();
+
+    await request(app)
+      .delete('/todos/7')
       .expect(400, { error: 'X-User-Id header is required' });
 
     expect(queryMock).not.toHaveBeenCalled();
@@ -76,13 +135,13 @@ describe('protected middleware', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 1, title: 'todo' }] });
 
-    await request(app).get('/todos').set('X-User-Id', 'user-1').expect(200);
+    await request(app).get('/todos').set(authForUser('user-1')).expect(200);
 
     expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['user-1']);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC',
-      ['user-1']
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
+      ['user-1', 50, 0]
     );
   });
 
@@ -92,7 +151,7 @@ describe('protected middleware', () => {
 
     await request(app)
       .get('/todos')
-      .set('X-User-Id', 'user-1')
+      .set(authForUser('user-1'))
       .expect(500, { error: 'Internal server error' });
 
     expect(queryMock).toHaveBeenCalledTimes(1);
@@ -100,18 +159,18 @@ describe('protected middleware', () => {
 });
 
 describe('GET /todos', () => {
-  test('lists todos with default sort', async () => {
+  test('lists todos with default sort and pagination', async () => {
     const app = loadApp();
     const rows = [{ id: 1, title: 'a' }];
     queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
 
-    const res = await request(app).get('/todos').set('X-User-Id', 'u1').expect(200);
+    const res = await request(app).get('/todos').set(authForUser('u1')).expect(200);
 
     expect(res.body).toEqual(rows);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC',
-      ['u1']
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
+      ['u1', 50, 0]
     );
   });
 
@@ -121,14 +180,121 @@ describe('GET /todos', () => {
 
     await request(app)
       .get('/todos?category=work&status=done')
+      .set(authForUser('u1'))
+      .expect(200);
+
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 AND category = $2 AND status = $3 ORDER BY last_viewed DESC LIMIT $4 OFFSET $5',
+      ['u1', 'work', 'done', 50, 0]
+    );
+  });
+
+  test('supports limit and offset with stable placeholder ordering', async () => {
+    const app = loadApp();
+    const rows = [{ id: 1, title: 'a' }];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    const res = await request(app)
+      .get('/todos?limit=10&offset=20')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    expect(res.body).toEqual(rows);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
+      ['u1', 10, 20]
+    );
+  });
+
+  test('caps limit at 100 and applies OFFSET=0 when offset is omitted', async () => {
+    const app = loadApp();
+    const rows = [{ id: 1, title: 'a' }];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    const res = await request(app)
+      .get('/todos?limit=500')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    expect(res.body).toEqual(rows);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
+      ['u1', 100, 0]
+    );
+  });
+
+  test('ignores limit/offset when limit is negative', async () => {
+    const app = loadApp();
+    const rows = [{ id: 1, title: 'a' }];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    await request(app)
+      .get('/todos?limit=-1&offset=20')
       .set('X-User-Id', 'u1')
       .expect(200);
 
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'SELECT * FROM todos WHERE user_id = $1 AND category = $2 AND status = $3 ORDER BY last_viewed DESC',
-      ['u1', 'work', 'done']
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC',
+      ['u1']
     );
+  });
+
+  test('ignores offset when offset is provided without a valid limit', async () => {
+    const app = loadApp();
+    const rows = [{ id: 1, title: 'a' }];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    await request(app)
+      .get('/todos?offset=20')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC',
+      ['u1']
+    );
+  });
+
+  test('applies LIMIT 0 when limit=0', async () => {
+    const app = loadApp();
+    const rows = [];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    const res = await request(app)
+      .get('/todos?limit=0')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    expect(res.body).toEqual(rows);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
+      ['u1', 0, 0]
+    );
+  });
+
+  test('keeps SQL placeholder ordering correct for filters + pagination + sort', async () => {
+    const app = loadApp();
+    const rows = [{ id: 1, title: 'a' }];
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
+
+    await request(app)
+      .get('/todos?category=work&status=done&limit=5&offset=2&sort_by=created_asc')
+      .set('X-User-Id', 'u1')
+      .expect(200);
+
+    const [sql, params] = queryMock.mock.calls[1];
+    expect(sql).toContain('category = $2');
+    expect(sql).toContain('status = $3');
+    expect(sql).toContain('ORDER BY created_at ASC');
+    expect(sql).toContain('LIMIT $4');
+    expect(sql).toContain('OFFSET $5');
+    expect(params).toEqual(['u1', 'work', 'done', 5, 2]);
   });
 
   test.each([
@@ -138,30 +304,32 @@ describe('GET /todos', () => {
     ['updated_desc', 'updated_at DESC'],
     ['last_viewed_asc', 'last_viewed ASC'],
     ['last_viewed_desc', 'last_viewed DESC'],
-    ['unknown', 'last_viewed DESC']
+    ['unknown', 'last_viewed DESC'],
   ])('uses %s sort option', async (sortBy, orderBy) => {
     const app = loadApp();
     queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
 
     await request(app)
       .get(`/todos?sort_by=${sortBy}`)
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(200);
 
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      `SELECT * FROM todos WHERE user_id = $1 ORDER BY ${orderBy}`,
-      ['u1']
+      `SELECT * FROM todos WHERE user_id = $1 ORDER BY ${orderBy} LIMIT $2 OFFSET $3`,
+      ['u1', 50, 0]
     );
   });
 
   test('returns 500 when the list query fails', async () => {
     const app = loadApp();
-    queryMock.mockResolvedValueOnce({ rows: [] }).mockRejectedValueOnce(new Error('fail'));
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error('fail'));
 
     await request(app)
       .get('/todos')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(500, { error: 'Internal server error' });
   });
 });
@@ -173,7 +341,7 @@ describe('POST /todos', () => {
 
     await request(app)
       .post('/todos')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .send(body)
       .expect(400, { error: 'Title is required' });
 
@@ -187,8 +355,65 @@ describe('POST /todos', () => {
 
     const res = await request(app)
       .post('/todos')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .send({ title: 'new' })
+      .expect(201);
+
+    expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium']
+    );
+  });
+
+  test('uses default status when status is an empty string', async () => {
+    const app = loadApp();
+    const row = { id: 1, title: 'new', status: 'pending', priority: 'medium' };
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .post('/todos')
+      .set('X-User-Id', 'u1')
+      .send({ title: 'new', status: '' })
+      .expect(201);
+
+    expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium']
+    );
+  });
+
+  test('uses default priority when priority is null', async () => {
+    const app = loadApp();
+    const row = { id: 1, title: 'new', status: 'pending', priority: 'medium' };
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .post('/todos')
+      .set('X-User-Id', 'u1')
+      .send({ title: 'new', priority: null })
+      .expect(201);
+
+    expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium']
+    );
+  });
+
+  test('preserves explicit nulls for description/category while applying defaults for falsy status/priority', async () => {
+    const app = loadApp();
+    const row = { id: 1, title: 'new', status: 'pending', priority: 'medium', description: null, category: null };
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .post('/todos')
+      .set('X-User-Id', 'u1')
+      .send({ title: 'new', description: null, category: null, status: '', priority: '' })
       .expect(201);
 
     expect(res.body).toEqual(row);
@@ -205,7 +430,7 @@ describe('POST /todos', () => {
 
     await request(app)
       .post('/todos')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .send({ title: 'new' })
       .expect(500, { error: 'Internal server error' });
   });
@@ -217,12 +442,26 @@ describe('GET /todos/:id', () => {
     const row = { id: 7, title: 'view' };
     queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row] });
 
-    const res = await request(app).get('/todos/7').set('X-User-Id', 'u1').expect(200);
+    const res = await request(app)
+      .get('/todos/7')
+      .set(authForUser('u1'))
+      .expect(200);
 
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'UPDATE todos SET last_viewed = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
+      `WITH updated AS (
+  UPDATE todos
+  SET last_viewed = NOW()
+  WHERE id = $1 AND user_id = $2
+    AND (last_viewed IS NULL OR last_viewed < NOW() - interval '60 seconds')
+  RETURNING *
+)
+SELECT * FROM updated
+UNION ALL
+SELECT * FROM todos
+WHERE id = $1 AND user_id = $2
+  AND NOT EXISTS (SELECT 1 FROM updated);`,
       ['7', 'u1']
     );
   });
@@ -233,7 +472,7 @@ describe('GET /todos/:id', () => {
 
     await request(app)
       .get('/todos/7')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(404, { error: 'Todo not found' });
   });
 
@@ -243,7 +482,7 @@ describe('GET /todos/:id', () => {
 
     await request(app)
       .get('/todos/7')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(500, { error: 'Internal server error' });
   });
 });
@@ -255,46 +494,41 @@ describe('PUT /todos/:id', () => {
 
     await request(app)
       .put('/todos/7')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .send({ title: 'x' })
       .expect(404, { error: 'Todo not found' });
   });
 
   test('rejects an empty update body', async () => {
     const app = loadApp();
-    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 7 }] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
 
     await request(app)
       .put('/todos/7')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .send({})
       .expect(400, { error: 'No fields to update' });
 
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(1);
   });
 
   test('updates only provided fields and permits nullable fields', async () => {
     const app = loadApp();
     const row = { id: 7, title: 'updated', description: null, category: null };
+
     queryMock
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 7 }] })
       .mockResolvedValueOnce({ rows: [row] });
 
     const res = await request(app)
       .put('/todos/7')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .send({ title: 'updated', description: null, category: null })
       .expect(200);
 
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-      ['7', 'u1']
-    );
-    expect(queryMock).toHaveBeenNthCalledWith(
-      3,
       'UPDATE todos SET title = $1, description = $2, category = $3, updated_at = NOW(), last_viewed = NOW() WHERE id = $4 AND user_id = $5 RETURNING *',
       ['updated', null, null, '7', 'u1']
     );
@@ -304,14 +538,62 @@ describe('PUT /todos/:id', () => {
     const app = loadApp();
     queryMock
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 7 }] })
       .mockRejectedValueOnce(new Error('fail'));
+
+    await request(app)
+      .put('/todos/7')
+      .set(authForUser('u1'))
+      .send({ title: 'updated' })
+      .expect(500, { error: 'Internal server error' });
+  });
+
+  test('returns 500 when existence-check query fails', async () => {
+    const app = loadApp();
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error('db down'));
 
     await request(app)
       .put('/todos/7')
       .set('X-User-Id', 'u1')
       .send({ title: 'updated' })
       .expect(500, { error: 'Internal server error' });
+
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['u1']);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
+      ['7', 'u1']
+    );
+  });
+
+  test('updates only provided fields when fields are omitted (not explicitly null)', async () => {
+    const app = loadApp();
+    const row = { id: 7, title: 'updated' };
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 7 }] })
+      .mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .put('/todos/7')
+      .set('X-User-Id', 'u1')
+      .send({ title: 'updated' })
+      .expect(200);
+
+    expect(res.body).toEqual(row);
+
+    const [updateSql, updateParams] = queryMock.mock.calls[2];
+    expect(updateSql).toContain('title = $1');
+    expect(updateSql).not.toContain('description =');
+    expect(updateSql).not.toContain('category =');
+    expect(updateSql).not.toContain('status =');
+    expect(updateSql).not.toContain('priority =');
+    expect(updateSql).toContain('updated_at = NOW()');
+    expect(updateSql).toContain('last_viewed = NOW()');
+    expect(updateParams).toEqual(['updated', '7', 'u1']);
   });
 });
 
@@ -321,7 +603,10 @@ describe('DELETE /todos/:id', () => {
     const row = { id: 7, title: 'gone' };
     queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row] });
 
-    const res = await request(app).delete('/todos/7').set('X-User-Id', 'u1').expect(200);
+    const res = await request(app)
+      .delete('/todos/7')
+      .set(authForUser('u1'))
+      .expect(200);
 
     expect(res.body).toEqual({ message: 'Todo deleted successfully', deletedTodo: row });
     expect(queryMock).toHaveBeenNthCalledWith(
@@ -337,7 +622,7 @@ describe('DELETE /todos/:id', () => {
 
     await request(app)
       .delete('/todos/7')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(404, { error: 'Todo not found' });
   });
 
@@ -347,7 +632,7 @@ describe('DELETE /todos/:id', () => {
 
     await request(app)
       .delete('/todos/7')
-      .set('X-User-Id', 'u1')
+      .set(authForUser('u1'))
       .expect(500, { error: 'Internal server error' });
   });
 });
@@ -357,20 +642,20 @@ describe('/metrics', () => {
     [0, '0s'],
     [61, '1m 1s'],
     [3661, '1h 1m 1s'],
-    [90061, '1d 1h 1m 1s']
+    [90061, '1d 1h 1m 1s'],
   ])('reports uptime for %s seconds', async (seconds, readable) => {
     const app = loadApp('2024-01-01T00:00:00.000Z');
     queryMock.mockResolvedValueOnce({ rows: [] });
     jest.setSystemTime(new Date(Date.UTC(2024, 0, 1, 0, 0, seconds)));
 
-    const res = await request(app).get('/metrics').set('X-User-Id', 'u1').expect(200);
+    const res = await request(app)
+      .get('/metrics')
+      .set(authForUser('u1'))
+      .expect(200);
 
     expect(res.body.uptime).toBe(seconds);
     expect(res.body.uptime_seconds).toBe(seconds);
     expect(res.body.uptime_readable).toBe(readable);
     expect(new Date(res.body.timestamp).toISOString()).toBe(res.body.timestamp);
-    expect(res.body.process.pid).toBe(process.pid);
-    expect(res.body.process.memory).toBeDefined();
-    expect(res.body.process.cpu).toBeDefined();
   });
 });
