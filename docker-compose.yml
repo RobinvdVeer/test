@@ -21,6 +21,8 @@ services:
     build:
       context: .
     image: ghcr.io/robinvdveer/metrics-server:latest
+    labels:
+      x-kong: "true"
     container_name: metrics_server_app
     ports:
       - "3000:3000"
