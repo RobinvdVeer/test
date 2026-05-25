@@ -1,5 +1,12 @@
 const { pool } = require('../db/pool');
 
+const parseOptionalNonNegativeInt = (v) => {
+  if (v === undefined || v === null) return null;
+  const n = Number.parseInt(v, 10);
+  if (!Number.isSafeInteger(n) || n < 0) return null;
+  return n;
+};
+
 async function listTodos(userId, { category, status, sort_by, limit, offset }) {
   let query = 'SELECT * FROM todos WHERE user_id = $1';
   const params = [userId];
@@ -16,13 +23,6 @@ async function listTodos(userId, { category, status, sort_by, limit, offset }) {
     query += ` AND status = $${paramCount}`;
     params.push(status);
   }
-
-  const parseOptionalNonNegativeInt = (v) => {
-    if (v === undefined || v === null) return null;
-    const n = Number.parseInt(v, 10);
-    if (!Number.isSafeInteger(n) || n < 0) return null;
-    return n;
-  };
 
   const requestedLimit = parseOptionalNonNegativeInt(limit);
   const requestedOffset = parseOptionalNonNegativeInt(offset);
@@ -84,8 +84,22 @@ async function createTodo(userId, { title, description, category, status, priori
 }
 
 async function getTodoAndUpdateLastViewed(userId, id) {
+  // Avoid writing to the DB on every read.
+  // Only bump `last_viewed` if it's stale (older than 60s), but always return
+  // the todo if it exists.
   const result = await pool.query(
-    'UPDATE todos SET last_viewed = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
+    `WITH updated AS (
+  UPDATE todos
+  SET last_viewed = NOW()
+  WHERE id = $1 AND user_id = $2
+    AND (last_viewed IS NULL OR last_viewed < NOW() - interval '60 seconds')
+  RETURNING *
+)
+SELECT * FROM updated
+UNION ALL
+SELECT * FROM todos
+WHERE id = $1 AND user_id = $2
+  AND NOT EXISTS (SELECT 1 FROM updated);`,
     [id, userId]
   );
 
@@ -93,16 +107,6 @@ async function getTodoAndUpdateLastViewed(userId, id) {
 }
 
 async function updateTodo(userId, id, { title, description, category, status, priority }) {
-  // First, check if todo exists and belongs to user
-  const checkResult = await pool.query(
-    'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-    [id, userId]
-  );
-
-  if (checkResult.rows.length === 0) {
-    return null;
-  }
-
   // Update only provided fields
   const updateFields = [];
   const updateValues = [];

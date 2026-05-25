@@ -222,7 +222,18 @@ describe('GET /todos/:id', () => {
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'UPDATE todos SET last_viewed = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
+      `WITH updated AS (
+  UPDATE todos
+  SET last_viewed = NOW()
+  WHERE id = $1 AND user_id = $2
+    AND (last_viewed IS NULL OR last_viewed < NOW() - interval '60 seconds')
+  RETURNING *
+)
+SELECT * FROM updated
+UNION ALL
+SELECT * FROM todos
+WHERE id = $1 AND user_id = $2
+  AND NOT EXISTS (SELECT 1 FROM updated);`,
       ['7', 'u1']
     );
   });
@@ -262,7 +273,7 @@ describe('PUT /todos/:id', () => {
 
   test('rejects an empty update body', async () => {
     const app = loadApp();
-    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 7 }] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
 
     await request(app)
       .put('/todos/7')
@@ -270,7 +281,7 @@ describe('PUT /todos/:id', () => {
       .send({})
       .expect(400, { error: 'No fields to update' });
 
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(1);
   });
 
   test('updates only provided fields and permits nullable fields', async () => {
@@ -278,7 +289,6 @@ describe('PUT /todos/:id', () => {
     const row = { id: 7, title: 'updated', description: null, category: null };
     queryMock
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 7 }] })
       .mockResolvedValueOnce({ rows: [row] });
 
     const res = await request(app)
@@ -290,11 +300,6 @@ describe('PUT /todos/:id', () => {
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-      ['7', 'u1']
-    );
-    expect(queryMock).toHaveBeenNthCalledWith(
-      3,
       'UPDATE todos SET title = $1, description = $2, category = $3, updated_at = NOW(), last_viewed = NOW() WHERE id = $4 AND user_id = $5 RETURNING *',
       ['updated', null, null, '7', 'u1']
     );
@@ -304,7 +309,6 @@ describe('PUT /todos/:id', () => {
     const app = loadApp();
     queryMock
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 7 }] })
       .mockRejectedValueOnce(new Error('fail'));
 
     await request(app)
