@@ -125,10 +125,60 @@
     },
     "/auth-config.json": {
       "get": {
-        "summary": "Authentication configuration",
+        "summary": "Auth configuration",
         "responses": {
           "200": {
-            "description": "Auth configuration"
+            "description": "OIDC client configuration",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "App root",
+        "responses": {
+          "200": {
+            "description": "HTML application shell",
+            "content": {
+              "text/html": {
+                "schema": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login": {
+      "get": {
+        "summary": "Login page",
+        "responses": {
+          "200": {
+            "description": "HTML login page",
+            "content": {
+              "text/html": {
+                "schema": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "summary": "OIDC callback page",
+        "responses": {
+          "200": {
+            "description": "HTML callback page",
+            "content": {
+              "text/html": {
+                "schema": { "type": "string" }
+              }
+            }
           }
         }
       }
@@ -139,36 +189,6 @@
         "responses": {
           "200": {
             "description": "Service is healthy"
-          }
-        }
-      }
-    },
-    "/login": {
-      "get": {
-        "summary": "Login page",
-        "responses": {
-          "200": {
-            "description": "HTML login page"
-          }
-        }
-      }
-    },
-    "/auth/callback": {
-      "get": {
-        "summary": "OIDC callback page",
-        "responses": {
-          "200": {
-            "description": "HTML callback page"
-          }
-        }
-      }
-    },
-    "/": {
-      "get": {
-        "summary": "App root",
-        "responses": {
-          "200": {
-            "description": "HTML application shell"
           }
         }
       }

@@ -98,6 +98,9 @@ describe('helm chart deployability conventions', () => {
     const docs = yaml.loadAll(rendered).filter(Boolean);
     const externalSecrets = docs.filter((doc) => doc.kind === 'ExternalSecret');
 
-    expect(externalSecrets.length).toBe(3);
+    expect(externalSecrets.length).toBeGreaterThanOrEqual(3);
+    expect(externalSecrets.map((doc) => doc.metadata.name)).toEqual(
+      expect.arrayContaining(['test-database', 'test-postgres', 'test-keycloak'])
+    );
   });
 });

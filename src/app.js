@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const openApiDocument = require('../openapi.json');
 const { getConfig } = require('./config');
 const { authMiddleware } = require('./middleware/user');
+const { ensureUserMiddleware } = require('./middleware/ensure-user');
 const { registerMetricsRoutes } = require('./routes/metrics');
 const { registerTodosRoutes } = require('./routes/todos');
 
@@ -55,7 +56,7 @@ function createApp() {
 
   registerMetricsRoutes(app, startTime);
 
-  app.use('/todos', authMiddleware, registerTodosRoutes());
+  app.use('/todos', authMiddleware, ensureUserMiddleware, registerTodosRoutes());
 
   return app;
 }
