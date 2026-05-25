@@ -11,16 +11,20 @@ Install the chart and provide secrets via Kubernetes (or External/Sealed Secrets
 
 ## Staging with External Secrets Operator (ESO)
 
-The staging values use External Secrets Operator. Before deploying, make sure the cluster has the referenced `ClusterSecretStore` and remote keys configured:
+The staging values can use External Secrets Operator when the cluster exposes the `external-secrets.io/v1beta1` API. Before deploying, make sure the referenced `ClusterSecretStore` and remote keys are configured:
 
 - `metrics-server/staging/database` property `database-url`
 - `metrics-server/staging/postgres` property `postgres-password`
+- `metrics-server/staging/keycloak-postgres` property `postgres-password`
+- `metrics-server/staging/keycloak` property `admin-password`
 
 ```sh
 helm upgrade --install metrics-server ./deploy/chart \
   -f ./deploy/values-staging.yaml \
   --set image.app.tag=<tag>
 ```
+
+If ESO is not installed, the chart will skip `ExternalSecret` resources; in that case, provide the required Kubernetes Secrets yourself.
 
 ## Non-ESO environments
 

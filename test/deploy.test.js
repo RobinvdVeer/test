@@ -118,7 +118,7 @@ describe('helm chart deployability conventions', () => {
     expect(postgresInit.data['init.sql']).toContain('CREATE INDEX IF NOT EXISTS idx_todos_user_id');
   });
 
-  maybeTest('renders ExternalSecret resources when enabled (staging)', () => {
+  maybeTest('renders ExternalSecret resources when ESO API is available (staging)', () => {
     const rendered = execFileSync(
       'helm',
       [
@@ -127,6 +127,8 @@ describe('helm chart deployability conventions', () => {
         'deploy/chart',
         '-f',
         'deploy/values-staging.yaml',
+        '--api-versions',
+        'external-secrets.io/v1beta1',
       ],
       { encoding: 'utf8' }
     );
