@@ -39,7 +39,7 @@ spec:
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
-              value: {{ printf "jdbc:postgresql://%s-keycloak-postgres:%d/%s" .Release.Name .Values.service.keycloakPostgres.port .Values.keycloak.database.database | quote }}
+              value: {{ printf "jdbc:postgresql://%s-keycloak-postgres:%d/%s" .Release.Name (int .Values.service.keycloakPostgres.port) .Values.keycloak.database.database | quote }}
             - name: KC_DB_USERNAME
               value: {{ .Values.keycloak.database.username | quote }}
             - name: KC_DB_PASSWORD

@@ -93,6 +93,16 @@
     }
   },
   "paths": {
+    "/": {
+      "get": {
+        "summary": "App shell",
+        "responses": {
+          "200": {
+            "description": "HTML app shell"
+          }
+        }
+      }
+    },
     "/openapi.json": {
       "get": {
         "summary": "OpenAPI document",
@@ -189,6 +199,36 @@
         "responses": {
           "200": {
             "description": "Service is healthy"
+          }
+        }
+      }
+    },
+    "/auth-config.json": {
+      "get": {
+        "summary": "Auth configuration",
+        "responses": {
+          "200": {
+            "description": "Keycloak client configuration"
+          }
+        }
+      }
+    },
+    "/login": {
+      "get": {
+        "summary": "Login page",
+        "responses": {
+          "200": {
+            "description": "HTML login page"
+          }
+        }
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "summary": "Auth callback page",
+        "responses": {
+          "200": {
+            "description": "HTML login callback page"
           }
         }
       }

@@ -65,7 +65,9 @@ describe('helm chart deployability conventions', () => {
 
     const docs = yaml.loadAll(rendered).filter(Boolean);
     const appDeployment = docs.find((doc) => doc.kind === 'Deployment' && doc.metadata.name === 'test-app');
+    const keycloakPostgresDeployment = docs.find((doc) => doc.kind === 'Deployment' && doc.metadata.name === 'test-keycloak-postgres');
     const keycloakDeployment = docs.find((doc) => doc.kind === 'Deployment' && doc.metadata.name === 'test-keycloak');
+    const keycloakService = docs.find((doc) => doc.kind === 'Service' && doc.metadata.name === 'test-keycloak');
     const keycloakSecret = docs.find((doc) => doc.kind === 'Secret' && doc.metadata.name === 'metrics-server-keycloak');
     const keycloakRealm = docs.find((doc) => doc.kind === 'ConfigMap' && doc.metadata.name === 'test-keycloak-realm');
 
@@ -73,13 +75,43 @@ describe('helm chart deployability conventions', () => {
     expect(appDeployment.spec.template.spec.containers[0].env).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'KEYCLOAK_ISSUER_URL', value: 'http://localhost:8081/realms/todos' }),
       expect.objectContaining({ name: 'KEYCLOAK_JWKS_URL' }),
+      expect.objectContaining({ name: 'KEYCLOAK_AUTHORIZE_URL', value: 'http://localhost:8081/realms/todos/protocol/openid-connect/auth' }),
+      expect.objectContaining({ name: 'KEYCLOAK_TOKEN_URL', value: 'http://localhost:8081/realms/todos/protocol/openid-connect/token' }),
+      expect.objectContaining({ name: 'KEYCLOAK_LOGOUT_URL', value: 'http://localhost:8081/realms/todos/protocol/openid-connect/logout' }),
+      expect.objectContaining({ name: 'AUTH_REDIRECT_URI', value: 'http://localhost:3000/auth/callback' }),
+      expect.objectContaining({ name: 'AUTH_POST_LOGOUT_REDIRECT_URI', value: 'http://localhost:3000/login' }),
       expect.objectContaining({ name: 'KEYCLOAK_CLIENT_ID', value: 'todo-app' }),
     ]));
 
+    expect(keycloakPostgresDeployment.spec.template.spec.containers[0].env).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'POSTGRES_USER', value: 'keycloak' }),
+      expect.objectContaining({ name: 'POSTGRES_DB', value: 'keycloak' }),
+      expect.objectContaining({ name: 'POSTGRES_PASSWORD', valueFrom: { secretKeyRef: { name: 'metrics-server-keycloak', key: 'postgres-password' } } }),
+    ]));
+
     expect(keycloakDeployment.spec.template.spec.containers[0].image).toBe('example.test/keycloak:kc123');
+    expect(keycloakDeployment.spec.template.spec.containers[0].command).toEqual(['/opt/keycloak/bin/kc.sh', 'start-dev', '--import-realm']);
+    expect(keycloakDeployment.spec.template.spec.containers[0].env).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'KEYCLOAK_ADMIN', value: 'admin' }),
+      expect.objectContaining({ name: 'KEYCLOAK_ADMIN_PASSWORD', valueFrom: { secretKeyRef: { name: 'metrics-server-keycloak', key: 'admin-password' } } }),
+      expect.objectContaining({ name: 'KC_DB_URL', value: 'jdbc:postgresql://test-keycloak-postgres:5432/keycloak' }),
+      expect.objectContaining({ name: 'KC_DB_USERNAME', value: 'keycloak' }),
+      expect.objectContaining({ name: 'KC_DB_PASSWORD', valueFrom: { secretKeyRef: { name: 'metrics-server-keycloak', key: 'postgres-password' } } }),
+      expect.objectContaining({ name: 'KC_HOSTNAME', value: 'localhost' }),
+      expect.objectContaining({ name: 'KC_HOSTNAME_PORT', value: '8080' }),
+    ]));
+    expect(keycloakDeployment.spec.template.spec.containers[0].volumeMounts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ mountPath: '/opt/keycloak/data/import/realm.json', subPath: 'realm.json' }),
+    ]));
+
+    expect(keycloakService.spec.type).toBe('ClusterIP');
+    expect(keycloakService.spec.ports[0]).toMatchObject({ port: 8080, targetPort: 'http', name: 'http' });
     expect(keycloakSecret.stringData['postgres-password']).toBe('kc-pass');
     expect(keycloakSecret.stringData['admin-password']).toBe('kc-admin');
+    expect(keycloakRealm.data['realm.json']).toContain('"realm": "todos"');
     expect(keycloakRealm.data['realm.json']).toContain('"clientId": "todo-app"');
+    expect(keycloakRealm.data['realm.json']).toContain('http://localhost:3000/auth/callback');
+    expect(keycloakRealm.data['realm.json']).toContain('http://localhost:3000');
   });
 
   maybeTest('renders ExternalSecret resources when enabled (staging)', () => {
