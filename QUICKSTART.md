@@ -8,11 +8,11 @@
 ### Start the Application
 ```bash
 cp .env.example .env
-# Edit .env and set POSTGRES_PASSWORD to a local development password.
+# Edit .env and set the required passwords.
 docker-compose up --build
 ```
 
-The app will be available at `http://localhost:3000`
+The app will be available at `http://localhost:3000` and the login page at `http://localhost:3000/login`.
 
 ## Common Commands
 
@@ -21,10 +21,16 @@ The app will be available at `http://localhost:3000`
 curl http://localhost:3000/health
 ```
 
+### Sign in
+1. Open `http://localhost:3000/login`
+2. Click **Login**
+3. Complete the Keycloak sign-in flow
+4. Use the returned access token in the examples below
+
 ### Create a Todo
 ```bash
 curl -X POST http://localhost:3000/todos \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Buy groceries",
@@ -35,28 +41,28 @@ curl -X POST http://localhost:3000/todos \
 
 ### List Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos"
 ```
 
 ### List Work Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?category=work"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?category=work"
 ```
 
 ### List Pending Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?status=pending"
 ```
 
 ### Find Forgotten Todos
 ```bash
-curl -H "X-User-Id: user123" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos?status=pending&sort_by=last_viewed_asc"
 ```
 
 ### Mark Todo as Complete
 ```bash
 curl -X PUT http://localhost:3000/todos/1 \
-  -H "X-User-Id: user123" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}'
 ```
@@ -64,7 +70,7 @@ curl -X PUT http://localhost:3000/todos/1 \
 ### Delete a Todo
 ```bash
 curl -X DELETE http://localhost:3000/todos/1 \
-  -H "X-User-Id: user123"
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 ### Run Example Script
@@ -76,18 +82,24 @@ chmod +x example-requests.sh
 ## Important Notes
 
 ### Docker Compose Configuration
-- `POSTGRES_USER` - PostgreSQL user (default: `todouser`)
-- `POSTGRES_DB` - PostgreSQL database (default: `tododb`)
-- `POSTGRES_PASSWORD` - PostgreSQL password (required; set this in `.env`)
+- `POSTGRES_USER` - PostgreSQL todo database user (default: `todouser`)
+- `POSTGRES_DB` - PostgreSQL todo database name (default: `tododb`)
+- `POSTGRES_PASSWORD` - PostgreSQL todo database password (required; set this in `.env`)
+- `KEYCLOAK_POSTGRES_USER` - Keycloak database user (default: `keycloak`)
+- `KEYCLOAK_POSTGRES_DB` - Keycloak database name (default: `keycloak`)
+- `KEYCLOAK_POSTGRES_PASSWORD` - Keycloak database password (required; set this in `.env`)
+- `KEYCLOAK_ADMIN` - Keycloak admin username (default: `admin`)
+- `KEYCLOAK_ADMIN_PASSWORD` - Keycloak admin password (required; set this in `.env`)
+- `KEYCLOAK_ISSUER_URL`, `KEYCLOAK_JWKS_URL`, `KEYCLOAK_CLIENT_ID`, `AUTH_REDIRECT_URI`, `AUTH_POST_LOGOUT_REDIRECT_URI` - Auth settings used by the browser login flow
 - `DATABASE_URL` - Optional override; otherwise built from the values above
 
 Use `.env.example` as the template for local development.
 
 
-### User Identification
-- Todo endpoints require the `X-User-Id` header
-- Each user gets isolated data
-- Example: `X-User-Id: user123`
+### Authentication
+- Open `/login` to start the Keycloak PKCE flow
+- Todo endpoints require an `Authorization: Bearer <access_token>` header
+- Each user only sees their own data based on the JWT `sub` claim
 
 ### Status Values
 - `pending` - Not started
@@ -182,7 +194,7 @@ docker-compose logs postgres
 
 Check server uptime and resource usage:
 ```bash
-curl -H "X-User-Id: user123" http://localhost:3000/metrics | jq
+curl http://localhost:3000/metrics | jq
 ```
 
 ## Stop the Application
