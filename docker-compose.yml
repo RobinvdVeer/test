@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or .env file}
       POSTGRES_DB: ${POSTGRES_DB:-tododb}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
@@ -26,6 +26,7 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-todouser}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or .env file}@postgres:5432/${POSTGRES_DB:-tododb}}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your environment or .env file}
       NODE_ENV: development
     depends_on:
       postgres:

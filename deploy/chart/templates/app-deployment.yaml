@@ -25,6 +25,11 @@ spec:
         - name: app
           image: "{{ .Values.image.app.repository }}:{{ .Values.image.app.tag }}"
           imagePullPolicy: {{ .Values.image.app.pullPolicy }}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: {{ .Values.app.port }}
@@ -38,6 +43,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.app.database.secretName }}
                   key: {{ .Values.app.database.secretKey }}
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.jwt.secretName }}
+                  key: {{ .Values.app.jwt.secretKey }}
           readinessProbe:
             httpGet:
               path: /health

@@ -25,6 +25,9 @@ app:
   database:
     secretName: metrics-server-database
     secretKey: database-url
+  jwt:
+    secretName: metrics-server-jwt
+    secretKey: jwt-secret
 
 # Optional chart-created secrets. Leave values empty in git; inject with
 # --set-string secrets.databaseUrl=$DATABASE_URL and
