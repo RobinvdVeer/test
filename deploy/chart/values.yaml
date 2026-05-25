@@ -37,6 +37,7 @@ secrets:
 
 externalSecrets:
   enabled: false
+  apiVersion: external-secrets.io/v1alpha1
   refreshInterval: 1h
   secretStoreRef:
     name: cluster-secret-store
