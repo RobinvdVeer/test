@@ -85,8 +85,8 @@ Use `.env.example` as the template for local development.
 
 
 ### User Identification
-- Todo endpoints require a Bearer JWT from Keycloak
-- Each user gets isolated data
+- Open `http://localhost:3000/login` to sign in or self-register with Keycloak
+- After login, copy the access token from the browser app's stored session and reuse it for curl requests
 - Example: `Authorization: Bearer $ACCESS_TOKEN`
 
 ### Status Values
@@ -180,9 +180,9 @@ docker-compose logs postgres
 
 ## Performance Metrics
 
-Check server uptime and resource usage:
+Check server uptime and resource usage after obtaining an access token:
 ```bash
-curl -H "X-User-Id: user123" http://localhost:3000/metrics | jq
+curl -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:3000/metrics | jq
 ```
 
 ## Stop the Application

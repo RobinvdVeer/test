@@ -136,8 +136,12 @@ The `init-db.sql` script automatically runs when starting Docker Compose, creati
 - Ready to scale to thousands of users with proper database optimization
 - Last viewed tracking enables efficient discovery of forgotten tasks
 
+## Authentication
+- Open `http://localhost:3000/login` to sign in or self-register with Keycloak.
+- The app uses PKCE to obtain an access token and stores it in the browser for API calls.
+- Relevant config: `APP_BASE_URL`, `KEYCLOAK_ISSUER`, `KEYCLOAK_JWKS_URL`, and `KEYCLOAK_CLIENT_ID`.
+
 ## Future Enhancements
-- JWT-based authentication
 - Due dates and reminders
 - Sharing and collaboration features
 - Recurring tasks
