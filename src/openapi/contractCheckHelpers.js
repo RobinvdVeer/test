@@ -19,6 +19,7 @@ function joinPath(a, b) {
 
 function collectExpressRoutes(app) {
   const routes = [];
+  const ignoredPaths = new Set(['/', '/login', '/auth/callback', '/app', '/auth/config']);
 
   function walk(stack, prefix) {
     for (const layer of stack) {
@@ -26,7 +27,9 @@ function collectExpressRoutes(app) {
         const methods = Object.keys(layer.route.methods || {}).filter((m) => layer.route.methods[m]);
         const expressPath = normalizeExpressPath(layer.route.path);
         const fullPath = joinPath(prefix, expressPath);
-        routes.push({ path: fullPath, methods: methods.sort() });
+        if (!ignoredPaths.has(fullPath)) {
+          routes.push({ path: fullPath, methods: methods.sort() });
+        }
       }
 
       // Nested routers

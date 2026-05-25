@@ -16,7 +16,7 @@ function commandExists(command) {
 }
 
 describe('docker compose deployability conventions', () => {
-  test('app is buildable and pushable while postgres remains external image-only', () => {
+  test('app, postgres, and Keycloak compose services are wired correctly', () => {
     const compose = readYaml('docker-compose.yml');
 
     expect(compose.services.app.build.context).toBe('.');
@@ -25,6 +25,13 @@ describe('docker compose deployability conventions', () => {
     expect(compose.services.postgres.image).toBe('postgres:16-alpine');
     expect(compose.services.postgres.build).toBeUndefined();
     expect(compose.services.postgres.labels).toBeUndefined();
+
+    expect(compose.services['keycloak-postgres'].image).toBe('postgres:16-alpine');
+    expect(compose.services['keycloak-postgres'].build).toBeUndefined();
+    expect(compose.services.keycloak.image).toBe('quay.io/keycloak/keycloak:26.0.7');
+    expect(compose.services.keycloak.command).toEqual(['start-dev', '--import-realm']);
+    expect(compose.services.keycloak.depends_on['keycloak-postgres'].condition).toBe('service_healthy');
+    expect(compose.services.keycloak.volumes[0]).toContain('./deploy/keycloak/realm-import.json');
 
     const rendered = execFileSync('env', [
       '-u', 'DATABASE_URL',
@@ -37,6 +44,8 @@ describe('docker compose deployability conventions', () => {
 
     expect(rendered).toContain('ghcr.io/robinvdveer/metrics-server:latest');
     expect(rendered).toContain('postgres:16-alpine');
+    expect(rendered).toContain('quay.io/keycloak/keycloak:26.0.7');
+    expect(rendered).toContain('/opt/keycloak/data/import/realm-import.json');
     expect(rendered).not.toContain('todopass');
   });
 });
