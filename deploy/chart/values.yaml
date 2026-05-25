@@ -32,18 +32,18 @@ service:
 app:
   port: 3000
   nodeEnv: production
-  publicUrl: http://localhost:3000
+  publicUrl: http://app.metrics-server.local
   database:
     secretName: metrics-server-database
     secretKey: database-url
   auth:
     clientId: todo-app
-    issuerUrl: http://localhost:8081/realms/todos
-    authorizeUrl: http://localhost:8081/realms/todos/protocol/openid-connect/auth
-    tokenUrl: http://localhost:8081/realms/todos/protocol/openid-connect/token
-    logoutUrl: http://localhost:8081/realms/todos/protocol/openid-connect/logout
-    redirectUri: http://localhost:3000/auth/callback
-    postLogoutRedirectUri: http://localhost:3000/login
+    issuerUrl: http://keycloak.metrics-server.local/realms/todos
+    authorizeUrl: http://keycloak.metrics-server.local/realms/todos/protocol/openid-connect/auth
+    tokenUrl: http://keycloak.metrics-server.local/realms/todos/protocol/openid-connect/token
+    logoutUrl: http://keycloak.metrics-server.local/realms/todos/protocol/openid-connect/logout
+    redirectUri: http://app.metrics-server.local/auth/callback
+    postLogoutRedirectUri: http://app.metrics-server.local/login
     scope: openid profile email
 
 secrets:
@@ -93,12 +93,18 @@ keycloak:
   enabled: true
   realm: todos
   clientId: todo-app
-  publicUrl: http://localhost:8081
-  hostname: localhost
+  publicUrl: http://keycloak.metrics-server.local
+  hostname: keycloak.metrics-server.local
   auth:
     username: admin
     passwordSecretName: metrics-server-keycloak
     passwordSecretKey: admin-password
+  ingress:
+    enabled: false
+    className: ""
+    host: keycloak.metrics-server.local
+    annotations: {}
+    tls: []
   database:
     username: keycloak
     database: keycloak
@@ -114,7 +120,7 @@ ingress:
   className: ""
   annotations: {}
   hosts:
-    - host: metrics-server.local
+    - host: app.metrics-server.local
       paths:
         - path: /
           pathType: Prefix
