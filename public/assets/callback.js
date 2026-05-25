@@ -1,10 +1,10 @@
-import { completeLoginFromCallback } from './auth.js';
+import { completeLoginFromCallback, sanitizeReturnTo } from './auth.js';
 
 const status = document.getElementById('status');
 
 (async () => {
   try {
-    const returnTo = await completeLoginFromCallback();
+    const returnTo = sanitizeReturnTo(await completeLoginFromCallback());
     window.location.replace(returnTo);
   } catch (err) {
     status.textContent = err.message || 'Authentication failed';
