@@ -258,6 +258,7 @@ function renderAppPage() {
         const reloadBtn = document.getElementById('reloadBtn');
         const logoutBtn = document.getElementById('logoutBtn');
         const form = document.getElementById('todoForm');
+        let currentTodos = [];
 
         function decodePayload(token) {
           const payload = token.split('.')[1];
@@ -379,7 +380,9 @@ function renderAppPage() {
           }
 
           form.reset();
-          await loadTodos();
+          renderTodos([payload, ...currentTodos]);
+          message.textContent = 'Created todo.';
+          message.className = 'success';
         });
 
         todoList.addEventListener('click', async (event) => {
@@ -394,7 +397,9 @@ function renderAppPage() {
             return;
           }
 
-          await loadTodos();
+          renderTodos(currentTodos.filter((todo) => String(todo.id) !== String(payload.deletedTodo.id)));
+          message.textContent = 'Deleted todo.';
+          message.className = 'success';
         });
 
         reloadBtn.addEventListener('click', () => loadTodos().catch((error) => {

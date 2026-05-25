@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
 const JWKS_CACHE_TTL_MS = 10 * 60 * 1000;
-const jwksCache = new Map(); // jwksUrl -> { fetchedAtMs, keysByKid }
+const jwksCache = new Map(); // jwksUrl -> { fetchedAtMs, keysByKid, inFlightPromise }
 
 function trimTrailingSlash(value) {
   return typeof value === 'string' ? value.replace(/\/$/, '') : value;
@@ -58,25 +58,53 @@ async function getJwks(jwksUrl) {
     return cached.keysByKid;
   }
 
-  const response = await fetch(jwksUrl);
-  if (!response.ok) {
-    throw new Error(`Unable to fetch JWKS: ${response.status}`);
+  if (cached?.inFlightPromise) {
+    return cached.inFlightPromise;
   }
 
-  const body = await response.json();
-  const keys = Array.isArray(body?.keys) ? body.keys : [];
-  const keysByKid = new Map();
+  const inFlightPromise = (async () => {
+    const response = await fetch(jwksUrl);
+    if (!response.ok) {
+      throw new Error(`Unable to fetch JWKS: ${response.status}`);
+    }
 
-  for (const jwk of keys) {
-    if (jwk?.kid) keysByKid.set(jwk.kid, jwk);
-  }
+    const body = await response.json();
+    const keys = Array.isArray(body?.keys) ? body.keys : [];
+    const keysByKid = new Map();
+
+    for (const jwk of keys) {
+      if (!jwk?.kid) continue;
+
+      keysByKid.set(jwk.kid, {
+        jwk,
+        publicKey: crypto.createPublicKey({ key: jwk, format: 'jwk' }),
+      });
+    }
+
+    jwksCache.set(jwksUrl, {
+      fetchedAtMs: Date.now(),
+      keysByKid,
+    });
+
+    return keysByKid;
+  })();
 
   jwksCache.set(jwksUrl, {
-    fetchedAtMs: Date.now(),
-    keysByKid,
+    ...(cached || {}),
+    inFlightPromise,
   });
 
-  return keysByKid;
+  try {
+    return await inFlightPromise;
+  } finally {
+    const current = jwksCache.get(jwksUrl);
+    if (current?.inFlightPromise === inFlightPromise) {
+      jwksCache.set(jwksUrl, {
+        ...(current.fetchedAtMs ? { fetchedAtMs: current.fetchedAtMs } : {}),
+        ...(current.keysByKid ? { keysByKid: current.keysByKid } : {}),
+      });
+    }
+  }
 }
 
 async function verifyKeycloakJwt(token) {
@@ -92,12 +120,12 @@ async function verifyKeycloakJwt(token) {
   }
 
   const keysByKid = await getJwks(config.jwksUrl);
-  const jwk = keysByKid.get(header.kid);
-  if (!jwk) {
+  const keyEntry = keysByKid.get(header.kid);
+  if (!keyEntry) {
     throw new Error('Unknown token key');
   }
 
-  const publicKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+  const publicKey = keyEntry.publicKey;
   const verifier = crypto.createVerify('RSA-SHA256');
   verifier.update(`${headerPart}.${payloadPart}`);
   verifier.end();
