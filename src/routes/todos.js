@@ -23,7 +23,7 @@ function registerTodosRoutes() {
       });
       res.json(result);
     } catch (error) {
-      console.error('Error fetching todos:', error);
+      console.error('Error fetching todos');
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -47,7 +47,7 @@ function registerTodosRoutes() {
 
       res.status(201).json(result);
     } catch (error) {
-      console.error('Error creating todo:', error);
+      console.error('Error creating todo');
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -64,7 +64,7 @@ function registerTodosRoutes() {
 
       res.json(result);
     } catch (error) {
-      console.error('Error fetching todo:', error);
+      console.error('Error fetching todo');
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -93,7 +93,7 @@ function registerTodosRoutes() {
 
       res.json(result);
     } catch (error) {
-      console.error('Error updating todo:', error);
+      console.error('Error updating todo');
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -110,7 +110,7 @@ function registerTodosRoutes() {
 
       res.json({ message: 'Todo deleted successfully', deletedTodo: result });
     } catch (error) {
-      console.error('Error deleting todo:', error);
+      console.error('Error deleting todo');
       res.status(500).json({ error: 'Internal server error' });
     }
   });

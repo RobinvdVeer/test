@@ -9,7 +9,7 @@ function createApp() {
   const app = express();
   const startTime = Date.now();
 
-  app.use(bodyParser.json());
+  app.use(bodyParser.json({ limit: '1mb' }));
 
   // Public endpoints used by gateways, health probes, and API discovery.
   app.get('/openapi.json', (req, res) => {

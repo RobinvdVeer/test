@@ -1,3 +1,4 @@
+const jwt = require('jsonwebtoken');
 const { pool } = require('../db/pool');
 
 async function ensureUserExists(userId) {
@@ -8,9 +9,29 @@ async function ensureUserExists(userId) {
 }
 
 function userMiddleware(req, res, next) {
-  const userId = req.headers['x-user-id'];
-  if (!userId) {
-    return res.status(400).json({ error: 'X-User-Id header is required' });
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res
+      .status(401)
+      .json({ error: 'Authorization bearer token is required' });
+  }
+
+  const token = authHeader.slice('Bearer '.length);
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    return res.status(500).json({ error: 'Server misconfigured' });
+  }
+
+  let userId;
+  try {
+    const payload = jwt.verify(token, jwtSecret);
+    userId = payload?.sub ?? payload?.userId ?? payload?.user_id;
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  if (!userId || typeof userId !== 'string') {
+    return res.status(401).json({ error: 'Invalid token payload' });
   }
 
   req.userId = userId;

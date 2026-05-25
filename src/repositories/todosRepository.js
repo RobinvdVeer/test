@@ -27,6 +27,13 @@ async function listTodos(userId, { category, status, sort_by, limit, offset }) {
   const requestedLimit = parseOptionalNonNegativeInt(limit);
   const requestedOffset = parseOptionalNonNegativeInt(offset);
 
+  // Always apply pagination with safe defaults.
+  const DEFAULT_LIMIT = 50;
+  const MAX_LIMIT = 100;
+
+  const safeLimit = requestedLimit === null ? DEFAULT_LIMIT : Math.min(requestedLimit, MAX_LIMIT);
+  const safeOffset = requestedOffset === null ? 0 : requestedOffset;
+
   // Default sort by last_viewed (most recently viewed first)
   const sortOption = sort_by || 'last_viewed_desc';
   switch (sortOption) {
@@ -50,18 +57,14 @@ async function listTodos(userId, { category, status, sort_by, limit, offset }) {
       query += ' ORDER BY last_viewed DESC';
   }
 
-  // Apply optional pagination only when a valid limit is provided.
-  const applyLimit = requestedLimit !== null;
-  if (applyLimit) {
-    paramCount += 1;
-    query += ` LIMIT $${paramCount}`;
-    params.push(Math.min(requestedLimit, 100));
+  // Apply pagination with safe defaults.
+  paramCount += 1;
+  query += ` LIMIT $${paramCount}`;
+  params.push(safeLimit);
 
-    // OFFSET is only meaningful when LIMIT is set.
-    paramCount += 1;
-    query += ` OFFSET $${paramCount}`;
-    params.push(requestedOffset ?? 0);
-  }
+  paramCount += 1;
+  query += ` OFFSET $${paramCount}`;
+  params.push(safeOffset);
 
   const result = await pool.query(query, params);
   return result.rows;
