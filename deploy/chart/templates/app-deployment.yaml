@@ -27,6 +27,8 @@ spec:
           imagePullPolicy: {{ .Values.image.app.pullPolicy }}
           securityContext:
             runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]

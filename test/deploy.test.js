@@ -73,6 +73,13 @@ describe('helm chart deployability conventions', () => {
     const postgresInit = docs.find((doc) => doc.kind === 'ConfigMap' && doc.metadata.name === 'test-postgres-init');
 
     expect(appDeployment.spec.template.spec.containers[0].image).toBe('example.test/app:abc123');
+    expect(appDeployment.spec.template.spec.containers[0].securityContext).toMatchObject({
+      runAsNonRoot: true,
+      runAsUser: 1000,
+      runAsGroup: 1000,
+      allowPrivilegeEscalation: false,
+      capabilities: { drop: ['ALL'] },
+    });
     expect(appDeployment.spec.template.spec.containers[0].env).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'KEYCLOAK_ISSUER_URL', value: 'http://localhost:8081/realms/todos' }),
       expect.objectContaining({ name: 'KEYCLOAK_JWKS_URL' }),

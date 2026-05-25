@@ -110,7 +110,7 @@ async function loadAuthClient() {
 }
 
 function readStoredAuth() {
-  return JSON.parse(global.localStorage.getItem('todo-auth'));
+  return JSON.parse(global.sessionStorage.getItem('todo-auth'));
 }
 
 afterEach(() => {
@@ -246,7 +246,7 @@ describe('browser auth helpers', () => {
 
     await expect(auth.completeLoginFromCallback()).rejects.toThrow('Invalid state');
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(global.localStorage.getItem('todo-auth')).toBeNull();
+    expect(global.sessionStorage.getItem('todo-auth')).toBeNull();
   });
 
   test('completeLoginFromCallback rejects non-2xx token exchange responses', async () => {
@@ -273,6 +273,6 @@ describe('browser auth helpers', () => {
     const auth = await loadAuthClient();
 
     await expect(auth.completeLoginFromCallback()).rejects.toThrow('Token exchange failed (502)');
-    expect(global.localStorage.getItem('todo-auth')).toBeNull();
+    expect(global.sessionStorage.getItem('todo-auth')).toBeNull();
   });
 });
