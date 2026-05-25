@@ -40,19 +40,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware to ensure user exists in database
-app.use(async (req, res, next) => {
-  try {
-    await pool.query(
-      'INSERT INTO users (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
-      [req.userId]
-    );
-    next();
-  } catch (error) {
-    console.error('Error ensuring user exists:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+async function ensureUserExists(userId) {
+  await pool.query(
+    'INSERT INTO users (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
+    [userId]
+  );
+}
 
 // ==================== METRICS ENDPOINTS ====================
 
@@ -79,7 +72,13 @@ app.get('/metrics', (req, res) => {
 app.get('/todos', async (req, res) => {
   try {
     const { category, status, sort_by } = req.query;
-    let query = 'SELECT * FROM todos WHERE user_id = $1';
+    const maxLimit = 100;
+    const defaultLimit = 50;
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const requestedOffset = Number.parseInt(req.query.offset, 10);
+    const limit = Number.isNaN(requestedLimit) ? defaultLimit : Math.min(Math.max(requestedLimit, 1), maxLimit);
+    const offset = Number.isNaN(requestedOffset) ? 0 : Math.max(requestedOffset, 0);
+    let query = 'SELECT id, user_id, title, description, category, status, priority, created_at, updated_at, last_viewed FROM todos WHERE user_id = $1';
     const params = [req.userId];
     let paramCount = 1;
 
@@ -99,24 +98,27 @@ app.get('/todos', async (req, res) => {
     const sortOption = sort_by || 'last_viewed_desc';
     switch (sortOption) {
       case 'created_asc':
-        query += ' ORDER BY created_at ASC';
+        query += ' ORDER BY created_at ASC, id ASC';
         break;
       case 'created_desc':
-        query += ' ORDER BY created_at DESC';
+        query += ' ORDER BY created_at DESC, id DESC';
         break;
       case 'updated_asc':
-        query += ' ORDER BY updated_at ASC';
+        query += ' ORDER BY updated_at ASC, id ASC';
         break;
       case 'updated_desc':
-        query += ' ORDER BY updated_at DESC';
+        query += ' ORDER BY updated_at DESC, id DESC';
         break;
       case 'last_viewed_asc':
-        query += ' ORDER BY last_viewed ASC';
+        query += ' ORDER BY last_viewed ASC, id ASC';
         break;
       case 'last_viewed_desc':
       default:
-        query += ' ORDER BY last_viewed DESC';
+        query += ' ORDER BY last_viewed DESC, id DESC';
     }
+
+    params.push(limit, offset);
+    query += ` LIMIT $${++paramCount} OFFSET $${++paramCount}`;
 
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -135,6 +137,8 @@ app.post('/todos', async (req, res) => {
       return res.status(400).json({ error: 'Title is required' });
     }
 
+    await ensureUserExists(req.userId);
+
     const result = await pool.query(
       'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
       [req.userId, title, description || null, category || null, status || 'pending', priority || 'medium']
@@ -152,9 +156,21 @@ app.get('/todos/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Update last_viewed timestamp
+    // Update last_viewed at most once every five minutes to avoid turning every read into an indexed write.
     const result = await pool.query(
-      'UPDATE todos SET last_viewed = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
+      `WITH selected AS (
+         SELECT * FROM todos WHERE id = $1 AND user_id = $2
+       ), updated AS (
+         UPDATE todos
+         SET last_viewed = NOW()
+         WHERE id = $1
+           AND user_id = $2
+           AND last_viewed < NOW() - INTERVAL '5 minutes'
+         RETURNING *
+       )
+       SELECT * FROM updated
+       UNION ALL
+       SELECT * FROM selected WHERE NOT EXISTS (SELECT 1 FROM updated)`,
       [id, req.userId]
     );
 
@@ -174,18 +190,6 @@ app.put('/todos/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, category, status, priority } = req.body;
-
-    // First, check if todo exists and belongs to user
-    const checkResult = await pool.query(
-      'SELECT * FROM todos WHERE id = $1 AND user_id = $2',
-      [id, req.userId]
-    );
-
-    if (checkResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Todo not found' });
-    }
-
-    const currentTodo = checkResult.rows[0];
 
     // Update only provided fields
     const updateFields = [];
@@ -223,6 +227,10 @@ app.put('/todos/:id', async (req, res) => {
 
     const query = `UPDATE todos SET ${updateFields.join(', ')} WHERE id = $${paramCount++} AND user_id = $${paramCount++} RETURNING *`;
     const result = await pool.query(query, updateValues);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
 
     res.json(result.rows[0]);
   } catch (error) {
