@@ -6,9 +6,16 @@ let queryMock;
 
 function loadApp() {
   jest.resetModules();
+
+  // Ensure required env vars for module initialization.
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ||
+    'postgresql://test:test@localhost:5432/testdb';
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret';
+
   queryMock = jest.fn();
   jest.doMock('pg', () => ({
-    Pool: jest.fn(() => ({ query: queryMock, end: jest.fn() }))
+    Pool: jest.fn(() => ({ query: queryMock, end: jest.fn() })),
   }));
   return require('../server').app;
 }
