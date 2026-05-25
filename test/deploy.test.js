@@ -21,8 +21,10 @@ describe('docker compose deployability conventions', () => {
 
     expect(compose.services.app.build.context).toBe('.');
     expect(compose.services.app.image).toBe('ghcr.io/robinvdveer/metrics-server:latest');
+    expect(compose.services.app.labels['x-kong']).toBe('true');
     expect(compose.services.postgres.image).toBe('postgres:16-alpine');
     expect(compose.services.postgres.build).toBeUndefined();
+    expect(compose.services.postgres.labels).toBeUndefined();
 
     const rendered = execFileSync('env', [
       '-u', 'DATABASE_URL',
