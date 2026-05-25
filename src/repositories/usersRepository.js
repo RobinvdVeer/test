@@ -1,11 +1,4 @@
-let pool;
-
-function getPool() {
-  if (!pool) {
-    ({ pool } = require('../db/pool'));
-  }
-  return pool;
-}
+const { getPool } = require('../db/pool');
 
 const USER_CACHE_TTL_MS = 5 * 60 * 1000;
 const USER_CACHE_MAX_ENTRIES = 10_000;
