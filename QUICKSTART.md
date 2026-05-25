@@ -1,4 +1,4 @@
-# Todo App Backend - Quick Start
+# Metrics Todo API - Quick Start
 
 ## 5-Minute Setup
 
@@ -7,6 +7,8 @@
 
 ### Start the Application
 ```bash
+cp .env.example .env
+# Edit .env and set POSTGRES_PASSWORD to a local development password.
 docker-compose up --build
 ```
 
@@ -73,8 +75,17 @@ chmod +x example-requests.sh
 
 ## Important Notes
 
+### Docker Compose Configuration
+- `POSTGRES_USER` - PostgreSQL user (default: `todouser`)
+- `POSTGRES_DB` - PostgreSQL database (default: `tododb`)
+- `POSTGRES_PASSWORD` - PostgreSQL password (required; set this in `.env`)
+- `DATABASE_URL` - Optional override; otherwise built from the values above
+
+Use `.env.example` as the template for local development.
+
+
 ### User Identification
-- All todo endpoints require the `X-User-Id` header
+- Todo endpoints require the `X-User-Id` header
 - Each user gets isolated data
 - Example: `X-User-Id: user123`
 
@@ -83,10 +94,14 @@ chmod +x example-requests.sh
 - `in_progress` - Currently working on it
 - `completed` - Done
 
+Requests with other status values return `400 Bad Request`.
+
 ### Priority Values
 - `low`
 - `medium` (default)
 - `high`
+
+Requests with other priority values return `400 Bad Request`.
 
 ### Sorting Options
 Default is `last_viewed_desc` (most recently viewed first)
@@ -103,12 +118,12 @@ Default is `last_viewed_desc` (most recently viewed first)
 - Host: `postgres`
 - Port: `5432`
 - User: `todouser`
-- Password: `todopass`
+- Password: from `POSTGRES_PASSWORD` in `.env`
 - Database: `tododb`
 
 **From localhost:**
 ```bash
-psql -h localhost -U todouser -d tododb
+psql -h localhost -U ${POSTGRES_USER:-todouser} -d ${POSTGRES_DB:-tododb}
 ```
 
 ## Documentation
@@ -121,6 +136,8 @@ psql -h localhost -U todouser -d tododb
 ## Troubleshooting
 
 ### Containers not starting
+Make sure `.env` exists and contains `POSTGRES_PASSWORD` before starting Docker Compose.
+
 ```bash
 # Check Docker daemon is running
 docker ps

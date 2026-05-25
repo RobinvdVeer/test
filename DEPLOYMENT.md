@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers deployment scenarios for the Todo App backend at various scales.
+This guide covers deployment scenarios for the Metrics Todo API at various scales.
 
 ## Local Development
 
@@ -16,6 +16,7 @@ npm install
 createdb tododb
 psql -U postgres tododb < init-db.sql
 
+export DATABASE_URL=postgresql://todouser:<password>@localhost:5432/tododb
 npm start
 ```
 
@@ -27,6 +28,8 @@ npm start
 
 ### Deployment
 ```bash
+cp .env.example .env
+# Edit .env and set POSTGRES_PASSWORD to a local development password.
 docker-compose up --build
 ```
 
@@ -55,57 +58,27 @@ docker-compose down
 - Rolling updates
 
 **Setup:**
-- Deploy Node.js app to Kubernetes or ECS
-- Use managed PostgreSQL (RDS, Cloud SQL, Azure Database for PostgreSQL)
-- Use container registry (ECR, Docker Hub, ACR)
+- Build and push the app image as `ghcr.io/robinvdveer/metrics-server:<tag>`
+- Deploy with the Helm chart in `deploy/chart`
+- Supply database credentials as Kubernetes, External, or Sealed Secrets; do not commit real secret values
+- Use managed PostgreSQL (RDS, Cloud SQL, Azure Database for PostgreSQL) for production, or the chart's PostgreSQL service for simple environments
 
-Example Kubernetes deployment:
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: todo-app
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: todo-app
-  template:
-    metadata:
-      labels:
-        app: todo-app
-    spec:
-      containers:
-      - name: todo-app
-        image: your-registry/todo-app:latest
-        ports:
-        - containerPort: 3000
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: db-secret
-              key: connection-string
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: todo-app-service
-spec:
-  selector:
-    app: todo-app
-  ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 3000
-  type: LoadBalancer
+Primary Kubernetes deployment path:
+```bash
+docker build -t ghcr.io/robinvdveer/metrics-server:<tag> .
+docker push ghcr.io/robinvdveer/metrics-server:<tag>
+
+export POSTGRES_PASSWORD='replace-me'
+export DATABASE_URL="postgresql://todouser:${POSTGRES_PASSWORD}@metrics-server-postgres:5432/tododb"
+helm upgrade --install metrics-server ./deploy/chart \
+  -f ./deploy/values-staging.yaml \
+  --set image.app.tag=<tag> \
+  --set secrets.create=true \
+  --set-string secrets.postgresPassword="$POSTGRES_PASSWORD" \
+  --set-string secrets.databaseUrl="$DATABASE_URL"
 ```
+
+See [deploy/README.md](./deploy/README.md) and [deploy/chart](./deploy/chart) for the chart values and secret options.
 
 #### 2. Database Scaling
 
@@ -198,6 +171,9 @@ curl http://your-app/health
 ```bash
 curl http://your-app/metrics
 # Returns: uptime, memory, CPU, process info
+
+curl http://your-app/openapi.json
+# Returns: OpenAPI 3 document for Kong/gateway registration
 ```
 
 ### Security Considerations
@@ -305,7 +281,10 @@ For thousands of concurrent users:
 ### Development
 ```
 PORT=3000
-DATABASE_URL=postgresql://todouser:todopass@localhost:5432/tododb
+POSTGRES_USER=todouser
+POSTGRES_DB=tododb
+POSTGRES_PASSWORD=change-me
+DATABASE_URL=postgresql://todouser:change-me@localhost:5432/tododb
 NODE_ENV=development
 ```
 
@@ -316,6 +295,8 @@ DATABASE_URL=postgresql://user:password@prod-db.example.com:5432/tododb
 NODE_ENV=production
 LOG_LEVEL=info
 ```
+
+For Docker Compose, copy `.env.example` to `.env` and set `POSTGRES_PASSWORD`; `DATABASE_URL` is optional and defaults from the PostgreSQL variables.
 
 ## Backup and Recovery
 

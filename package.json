@@ -1,13 +1,13 @@
 {
   "name": "metrics-server",
   "version": "1.0.0",
-  "description": "Simple metrics server with uptime endpoint",
+  "description": "Metrics Todo API with uptime and user-scoped todo endpoints",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
   },
-  "keywords": ["metrics", "uptime"],
+  "keywords": ["metrics", "uptime", "todos"],
   "author": "",
   "license": "MIT",
   "dependencies": {

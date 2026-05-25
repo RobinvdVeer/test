@@ -4,10 +4,14 @@ const { Pool } = require('pg');
 const openApiDocument = require('./openapi.json');
 const app = express();
 const PORT = process.env.PORT || 3000;
+const VALID_STATUSES = ['pending', 'in_progress', 'completed'];
+const VALID_PRIORITIES = ['low', 'medium', 'high'];
+const databaseUrl = process.env.DATABASE_URL ||
+  `postgresql://${process.env.POSTGRES_USER || 'todouser'}:${process.env.POSTGRES_PASSWORD || 'change-me'}@localhost:5432/${process.env.POSTGRES_DB || 'tododb'}`;
 
 // Database connection pool
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://todouser:todopass@localhost:5432/tododb',
+  connectionString: databaseUrl,
 });
 
 // Middleware
@@ -28,6 +32,25 @@ app.get('/api/docs/openapi.json', (req, res) => {
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// ==================== METRICS ENDPOINTS ====================
+
+// /metrics endpoint that returns process uptime
+app.get('/metrics', (req, res) => {
+  const uptime = (Date.now() - startTime) / 1000; // uptime in seconds
+
+  res.json({
+    uptime: uptime,
+    uptime_seconds: Math.floor(uptime),
+    uptime_readable: formatUptime(uptime),
+    timestamp: new Date().toISOString(),
+    process: {
+      pid: process.pid,
+      memory: process.memoryUsage(),
+      cpu: process.cpuUsage()
+    }
+  });
 });
 
 // Middleware to extract and validate user from header
@@ -52,25 +75,6 @@ app.use(async (req, res, next) => {
     console.error('Error ensuring user exists:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
-
-// ==================== METRICS ENDPOINTS ====================
-
-// /metrics endpoint that returns process uptime
-app.get('/metrics', (req, res) => {
-  const uptime = (Date.now() - startTime) / 1000; // uptime in seconds
-  
-  res.json({
-    uptime: uptime,
-    uptime_seconds: Math.floor(uptime),
-    uptime_readable: formatUptime(uptime),
-    timestamp: new Date().toISOString(),
-    process: {
-      pid: process.pid,
-      memory: process.memoryUsage(),
-      cpu: process.cpuUsage()
-    }
-  });
 });
 
 // ==================== TODO ENDPOINTS ====================
@@ -134,6 +138,12 @@ app.post('/todos', async (req, res) => {
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
     }
+    if (status !== undefined && !VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}` });
+    }
+    if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) {
+      return res.status(400).json({ error: `Priority must be one of: ${VALID_PRIORITIES.join(', ')}` });
+    }
 
     const result = await pool.query(
       'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
@@ -185,8 +195,6 @@ app.put('/todos/:id', async (req, res) => {
       return res.status(404).json({ error: 'Todo not found' });
     }
 
-    const currentTodo = checkResult.rows[0];
-
     // Update only provided fields
     const updateFields = [];
     const updateValues = [];
@@ -205,10 +213,16 @@ app.put('/todos/:id', async (req, res) => {
       updateValues.push(category);
     }
     if (status !== undefined) {
+      if (!VALID_STATUSES.includes(status)) {
+        return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}` });
+      }
       updateFields.push(`status = $${paramCount++}`);
       updateValues.push(status);
     }
     if (priority !== undefined) {
+      if (!VALID_PRIORITIES.includes(priority)) {
+        return res.status(400).json({ error: `Priority must be one of: ${VALID_PRIORITIES.join(', ')}` });
+      }
       updateFields.push(`priority = $${paramCount++}`);
       updateValues.push(priority);
     }
@@ -258,13 +272,13 @@ function formatUptime(seconds) {
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   const parts = [];
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
   if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
-  
+
   return parts.join(' ');
 }
 
