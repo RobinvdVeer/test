@@ -15,6 +15,7 @@ The staging values use External Secrets Operator. Before deploying, make sure th
 
 - `metrics-server/staging/database` property `database-url`
 - `metrics-server/staging/postgres` property `postgres-password`
+- `metrics-server/staging/jwt` property `jwt-secret`
 
 ```sh
 helm upgrade --install metrics-server ./deploy/chart \

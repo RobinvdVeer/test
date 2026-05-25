@@ -21,3 +21,7 @@ externalSecrets:
     remoteRef:
       key: metrics-server/staging/postgres
       property: postgres-password
+  jwt:
+    remoteRef:
+      key: metrics-server/staging/jwt
+      property: jwt-secret

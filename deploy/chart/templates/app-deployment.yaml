@@ -48,6 +48,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.app.jwt.secretName }}
                   key: {{ .Values.app.jwt.secretKey }}
+                  optional: true
           readinessProbe:
             httpGet:
               path: /health
