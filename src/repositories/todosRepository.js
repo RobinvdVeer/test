@@ -85,19 +85,7 @@ async function createTodo(userId, { title, description, category, status, priori
 
 async function getTodoAndUpdateLastViewed(userId, id) {
   const result = await pool.query(
-    `WITH selected AS (
-       SELECT * FROM todos WHERE id = $1 AND user_id = $2
-     ), updated AS (
-       UPDATE todos
-       SET last_viewed = NOW()
-       WHERE id = $1
-         AND user_id = $2
-         AND last_viewed < NOW() - INTERVAL '5 minutes'
-       RETURNING *
-     )
-     SELECT * FROM updated
-     UNION ALL
-     SELECT * FROM selected WHERE NOT EXISTS (SELECT 1 FROM updated)`,
+    'UPDATE todos SET last_viewed = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
     [id, userId]
   );
 
