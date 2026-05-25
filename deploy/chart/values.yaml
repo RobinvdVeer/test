@@ -40,7 +40,10 @@ secrets:
 
 externalSecrets:
   enabled: false
-  apiVersion: external-secrets.io/v1alpha1
+  # External Secrets Operator CRD apiVersion for the `ExternalSecret` kind.
+  # Must match the CRD installed in the target cluster (for example:
+  # `external-secrets.io/v1alpha1` or `external-secrets.io/v1beta1`).
+  apiVersion: ""
   refreshInterval: 1h
   secretStoreRef:
     name: cluster-secret-store

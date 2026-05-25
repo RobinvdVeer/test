@@ -10,7 +10,7 @@ ingress:
 
 externalSecrets:
   enabled: true
-  apiVersion: external-secrets.io/v1alpha1
+  apiVersion: external-secrets.io/v1alpha1 # Must match the External Secrets Operator CRD version installed in staging (e.g. v1alpha1 vs v1beta1).
   secretStoreRef:
     name: cluster-secret-store
     kind: ClusterSecretStore
