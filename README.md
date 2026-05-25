@@ -1,6 +1,6 @@
-# Todo App Backend
+# Metrics & Todo API
 
-A multi-user todo application backend built with Express.js and PostgreSQL. Includes metrics endpoint for monitoring.
+A multi-user todo API built with Express.js and PostgreSQL. Includes a metrics endpoint for monitoring.
 
 ## Features
 
