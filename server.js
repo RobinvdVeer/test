@@ -1,5 +1,6 @@
 const { createApp } = require('./src/app');
 const { getConfig } = require('./src/config');
+const { getPool, closePool } = require('./src/db/pool');
 
 const { PORT } = getConfig();
 
@@ -15,7 +16,7 @@ if (require.main === module) {
     process.exit(1);
   }
 
-  ({ pool } = require('./src/db/pool'));
+  pool = getPool();
 
   server = app.listen(PORT, () => {
     console.log(`Todo app running on http://localhost:${PORT}`);
@@ -30,8 +31,7 @@ if (require.main === module) {
 
     server.close(() => {
       console.log('HTTP server closed');
-      pool
-        .end()
+      closePool()
         .then(() => {
           console.log('Database pool closed');
           process.exit(0);

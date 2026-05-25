@@ -2,6 +2,7 @@ const crypto = require('crypto');
 
 const JWKS_CACHE_TTL_MS = 5 * 60 * 1000;
 const jwksCache = new Map();
+const jwksFetchPromises = new Map();
 
 function base64UrlEncode(input) {
   return Buffer.from(input)
@@ -17,6 +18,17 @@ function base64UrlDecodeJson(segment) {
   return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
 }
 
+function base64UrlDecodeBuffer(segment) {
+  const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+  const buffer = Buffer.from(padded, 'base64');
+  const canonical = base64UrlEncode(buffer);
+  if (canonical !== segment) {
+    throw new Error('Invalid token signature');
+  }
+  return buffer;
+}
+
 async function fetchJwks(jwksUrl) {
   const cached = jwksCache.get(jwksUrl);
   const now = Date.now();
@@ -24,17 +36,31 @@ async function fetchJwks(jwksUrl) {
     return cached.jwks;
   }
 
-  const response = await fetch(jwksUrl, {
-    headers: { accept: 'application/json' },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch JWKS: ${response.status}`);
+  const inFlight = jwksFetchPromises.get(jwksUrl);
+  if (inFlight) {
+    return inFlight;
   }
 
-  const jwks = await response.json();
-  jwksCache.set(jwksUrl, { jwks, cachedAt: now });
-  return jwks;
+  const fetchPromise = (async () => {
+    try {
+      const response = await fetch(jwksUrl, {
+        headers: { accept: 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch JWKS: ${response.status}`);
+      }
+
+      const jwks = await response.json();
+      jwksCache.set(jwksUrl, { jwks, cachedAt: Date.now() });
+      return jwks;
+    } finally {
+      jwksFetchPromises.delete(jwksUrl);
+    }
+  })();
+
+  jwksFetchPromises.set(jwksUrl, fetchPromise);
+  return fetchPromise;
 }
 
 function normalizeAudience(payloadAud) {
@@ -49,10 +75,7 @@ function verifySignature(token, jwk) {
   verifier.end();
 
   const publicKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
-  return verifier.verify(
-    publicKey,
-    Buffer.from(encodedSignature.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
-  );
+  return verifier.verify(publicKey, base64UrlDecodeBuffer(encodedSignature));
 }
 
 async function verifyJwt(token, { issuer, jwksUrl, clientId }) {

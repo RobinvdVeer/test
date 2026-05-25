@@ -1,11 +1,10 @@
-const { pool } = require('../db/pool');
-
-const parseOptionalNonNegativeInt = (v) => {
-  if (v === undefined || v === null) return null;
-  const n = Number.parseInt(v, 10);
-  if (!Number.isSafeInteger(n) || n < 0) return null;
-  return n;
-};
+const { getPool } = require('../db/pool');
+const {
+  DEFAULT_TODO_PRIORITY,
+  DEFAULT_TODO_STATUS,
+  VALID_PRIORITY,
+  VALID_STATUS,
+} = require('../todos/rules');
 
 async function listTodos(userId, { category, status, sort_by, limit, offset }) {
   let query = 'SELECT * FROM todos WHERE user_id = $1';
@@ -82,33 +81,30 @@ async function listTodos(userId, { category, status, sort_by, limit, offset }) {
     params.push(safeOffset);
   }
 
-  const result = await pool.query(query, params);
+  const result = await getPool().query(query, params);
   return result.rows;
 }
-
-const VALID_STATUSES = new Set(['pending', 'in_progress', 'completed']);
-const VALID_PRIORITIES = new Set(['low', 'medium', 'high']);
 
 function validateStatusPriority({ status, priority }) {
   const err = new Error('Status must be one of: pending, in_progress, completed');
   err.code = 'INVALID_STATUS_PRIORITY';
 
-  if (status !== undefined && status !== null && !VALID_STATUSES.has(status)) {
+  if (status !== undefined && status !== null && !VALID_STATUS.has(status)) {
     throw err;
   }
 
-  if (priority !== undefined && priority !== null && !VALID_PRIORITIES.has(priority)) {
+  if (priority !== undefined && priority !== null && !VALID_PRIORITY.has(priority)) {
     throw err;
   }
 }
 
 async function createTodo(userId, { title, description, category, status, priority }) {
-  const statusToUse = status || 'pending';
-  const priorityToUse = priority || 'medium';
+  const statusToUse = status || DEFAULT_TODO_STATUS;
+  const priorityToUse = priority || DEFAULT_TODO_PRIORITY;
 
   validateStatusPriority({ status: statusToUse, priority: priorityToUse });
 
-  const result = await pool.query(
+  const result = await getPool().query(
     'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
     [
       userId,
@@ -127,7 +123,7 @@ async function getTodoAndUpdateLastViewed(userId, id) {
   // Avoid writing to the DB on every read.
   // Only bump `last_viewed` if it's stale (older than 60s), but always return
   // the todo if it exists.
-  const result = await pool.query(
+  const result = await getPool().query(
     `WITH updated AS (
   UPDATE todos
   SET last_viewed = NOW()
@@ -190,12 +186,12 @@ async function updateTodo(userId, id, { title, description, category, status, pr
   // Append WHERE-clause args at the end.
   updateValues.push(id, userId);
 
-  const result = await pool.query(query, updateValues);
+  const result = await getPool().query(query, updateValues);
   return result.rows[0] || null;
 }
 
 async function deleteTodo(userId, id) {
-  const result = await pool.query(
+  const result = await getPool().query(
     'DELETE FROM todos WHERE id = $1 AND user_id = $2 RETURNING *',
     [id, userId]
   );

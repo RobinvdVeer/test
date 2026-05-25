@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS todos (
 CREATE INDEX IF NOT EXISTS idx_todos_user_id ON todos(user_id);
 CREATE INDEX IF NOT EXISTS idx_todos_user_status ON todos(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category ON todos(user_id, category);
+CREATE INDEX IF NOT EXISTS idx_todos_user_status_category ON todos(user_id, status, category);
 CREATE INDEX IF NOT EXISTS idx_todos_last_viewed ON todos(user_id, last_viewed);
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_last_viewed ON todos(user_id, status, last_viewed);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_last_viewed ON todos(user_id, category, last_viewed);
