@@ -9,6 +9,14 @@ image:
     repository: postgres
     tag: 16-alpine
     pullPolicy: IfNotPresent
+  keycloak:
+    repository: quay.io/keycloak/keycloak
+    tag: 26.0.7
+    pullPolicy: IfNotPresent
+  keycloakPostgres:
+    repository: postgres
+    tag: 16-alpine
+    pullPolicy: IfNotPresent
 
 service:
   app:
@@ -16,6 +24,13 @@ service:
     port: 80
     targetPort: 3000
   postgres:
+    type: ClusterIP
+    port: 5432
+  keycloak:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  keycloakPostgres:
     type: ClusterIP
     port: 5432
 
@@ -31,6 +46,42 @@ app:
     secretName: metrics-server-database
     secretKey: database-url
 
+keycloak:
+  enabled: true
+  realm: todos
+  hostname: localhost
+  publicUrl: http://localhost:8081
+  admin:
+    username: admin
+  auth:
+    adminPasswordSecretName: metrics-server-keycloak-admin
+    adminPasswordSecretKey: admin-password
+  client:
+    id: todo-frontend
+    name: Todo Frontend
+    redirectUris:
+      - http://localhost:3000/auth/callback
+      - http://localhost:3000/auth/callback/*
+    webOrigins:
+      - http://localhost:3000
+  realmConfig:
+    registrationAllowed: true
+    registrationEmailAsUsername: false
+    loginWithEmailAllowed: true
+    duplicateEmailsAllowed: false
+    resetPasswordAllowed: true
+    editUsernameAllowed: true
+    rememberMe: true
+  postgres:
+    username: keycloak
+    database: keycloak
+    passwordSecretName: metrics-server-keycloak-postgres
+    passwordSecretKey: postgres-password
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClassName: ""
+
 # Optional chart-created secrets. Leave values empty in git; inject with
 # --set-string secrets.databaseUrl=$DATABASE_URL and
 # --set-string secrets.postgresPassword=$POSTGRES_PASSWORD, or provide your own
@@ -39,6 +90,8 @@ secrets:
   create: false
   databaseUrl: ""
   postgresPassword: ""
+  keycloakAdminPassword: ""
+  keycloakPostgresPassword: ""
 
 externalSecrets:
   enabled: false

@@ -25,8 +25,17 @@ function getKeycloakConfig() {
   };
 }
 
-function getAuthEndpoints() {
+function validateKeycloakConfig() {
   const config = getKeycloakConfig();
+  if (process.env.NODE_ENV === 'production' && !config.enabled) {
+    throw new Error('Keycloak configuration is required in production');
+  }
+
+  return config;
+}
+
+function getAuthEndpoints() {
+  const config = validateKeycloakConfig();
 
   if (!config.enabled) return { ...config };
 
@@ -166,7 +175,7 @@ async function verifyKeycloakJwt(token) {
 }
 
 function isKeycloakConfigured() {
-  return getKeycloakConfig().enabled;
+  return validateKeycloakConfig().enabled;
 }
 
 function isBearerToken(value) {
@@ -178,5 +187,6 @@ module.exports = {
   getKeycloakConfig,
   isBearerToken,
   isKeycloakConfigured,
+  validateKeycloakConfig,
   verifyKeycloakJwt,
 };

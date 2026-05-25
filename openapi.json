@@ -251,6 +251,56 @@
         }
       }
     },
+    "/": {
+      "get": {
+        "summary": "Root redirect",
+        "responses": {
+          "302": {
+            "description": "Redirects to the app"
+          }
+        }
+      }
+    },
+    "/login": {
+      "get": {
+        "summary": "Login page",
+        "responses": {
+          "200": {
+            "description": "HTML login page"
+          }
+        }
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "summary": "OIDC callback page",
+        "responses": {
+          "200": {
+            "description": "HTML callback page"
+          }
+        }
+      }
+    },
+    "/app": {
+      "get": {
+        "summary": "Frontend app",
+        "responses": {
+          "200": {
+            "description": "HTML app page"
+          }
+        }
+      }
+    },
+    "/auth/config": {
+      "get": {
+        "summary": "Auth config",
+        "responses": {
+          "200": {
+            "description": "Authentication configuration"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health check",
