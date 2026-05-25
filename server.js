@@ -268,20 +268,26 @@ function formatUptime(seconds) {
   return parts.join(' ');
 }
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    pool.end(() => {
-      console.log('Database pool closed');
-      process.exit(0);
+let server;
+
+if (require.main === module) {
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+      pool.end(() => {
+        console.log('Database pool closed');
+        process.exit(0);
+      });
     });
   });
-});
 
-const server = app.listen(PORT, () => {
-  console.log(`Metrics & Todo server running on http://localhost:${PORT}`);
-  console.log(`Access metrics at http://localhost:${PORT}/metrics`);
-  console.log(`Access todos at http://localhost:${PORT}/todos (requires X-User-Id header)`);
-});
+  server = app.listen(PORT, () => {
+    console.log(`Metrics & Todo server running on http://localhost:${PORT}`);
+    console.log(`Access metrics at http://localhost:${PORT}/metrics`);
+    console.log(`Access todos at http://localhost:${PORT}/todos (requires X-User-Id header)`);
+  });
+}
+
+module.exports = { app, pool, formatUptime };
