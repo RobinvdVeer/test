@@ -83,5 +83,45 @@ describe('helm chart deployability conventions', () => {
     const docs = yaml.loadAll(rendered).filter(Boolean);
 
     expect(docs.some((doc) => doc.kind === 'Secret')).toBe(false);
+    expect(docs.some((doc) => doc.kind === 'ExternalSecret')).toBe(false);
+  });
+
+  maybeTest('renders ExternalSecret resources when enabled (staging)', () => {
+    const rendered = execFileSync(
+      'helm',
+      [
+        'template',
+        'test',
+        'deploy/chart',
+        '-f',
+        'deploy/values-staging.yaml',
+      ],
+      { encoding: 'utf8' }
+    );
+
+    const docs = yaml.loadAll(rendered).filter(Boolean);
+    const externalSecrets = docs.filter((doc) => doc.kind === 'ExternalSecret');
+
+    expect(externalSecrets.length).toBeGreaterThanOrEqual(2);
+
+    for (const es of externalSecrets) {
+      expect(es.apiVersion).toBe('external-secrets.io/v1alpha1');
+    }
+
+    const database = externalSecrets.find((es) => es.metadata.name === 'test-database');
+    const postgres = externalSecrets.find((es) => es.metadata.name === 'test-postgres');
+
+    expect(database).toBeDefined();
+    expect(postgres).toBeDefined();
+
+    expect(database.spec.target.name).toBe('metrics-server-database');
+    expect(database.spec.data[0].secretKey).toBe('database-url');
+    expect(database.spec.data[0].remoteRef.key).toBe('metrics-server/staging/database');
+    expect(database.spec.data[0].remoteRef.property).toBe('database-url');
+
+    expect(postgres.spec.target.name).toBe('metrics-server-postgres');
+    expect(postgres.spec.data[0].secretKey).toBe('postgres-password');
+    expect(postgres.spec.data[0].remoteRef.key).toBe('metrics-server/staging/postgres');
+    expect(postgres.spec.data[0].remoteRef.property).toBe('postgres-password');
   });
 });
