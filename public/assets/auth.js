@@ -12,16 +12,16 @@ export async function loadAuthConfig() {
 }
 
 export function getStoredAuth() {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = sessionStorage.getItem(STORAGE_KEY);
   return raw ? JSON.parse(raw) : null;
 }
 
 export function setStoredAuth(auth) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
 }
 
 export function clearStoredAuth() {
-  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
 }
 
 export function getReturnTo(defaultValue = '/') {
@@ -29,7 +29,7 @@ export function getReturnTo(defaultValue = '/') {
 }
 
 export function setReturnTo(returnTo) {
-  sessionStorage.setItem(RETURN_TO_KEY, returnTo);
+  sessionStorage.setItem(RETURN_TO_KEY, sanitizeReturnTo(returnTo));
 }
 
 export function clearReturnTo() {
@@ -147,6 +147,16 @@ export function logout() {
   clearPkceState();
 
   return auth;
+}
+
+export function sanitizeReturnTo(returnTo) {
+  try {
+    const url = new URL(returnTo, window.location.origin);
+    if (url.origin !== window.location.origin) return '/';
+    return `${url.pathname}${url.search}${url.hash}` || '/';
+  } catch (_) {
+    return '/';
+  }
 }
 
 function base64UrlEncode(value) {

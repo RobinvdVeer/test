@@ -20,25 +20,11 @@
   "users": [
     {
       "username": "alice",
-      "enabled": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "password",
-          "temporary": false
-        }
-      ]
+      "enabled": true
     },
     {
       "username": "bob",
-      "enabled": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "password",
-          "temporary": false
-        }
-      ]
+      "enabled": true
     }
   ]
 }

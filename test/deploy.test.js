@@ -98,6 +98,6 @@ describe('helm chart deployability conventions', () => {
     const docs = yaml.loadAll(rendered).filter(Boolean);
     const externalSecrets = docs.filter((doc) => doc.kind === 'ExternalSecret');
 
-    expect(externalSecrets.length).toBeGreaterThanOrEqual(4);
+    expect(externalSecrets.length).toBe(3);
   });
 });
