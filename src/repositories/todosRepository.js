@@ -4,6 +4,7 @@ const {
   DEFAULT_TODO_STATUS,
   VALID_PRIORITY,
   VALID_STATUS,
+  validateDueDate,
 } = require('../todos/rules');
 
 async function listTodos(userId, { category, status, sort_by, limit, offset }) {
@@ -96,24 +97,6 @@ function validateStatusPriority({ status, priority }) {
   if (priority !== undefined && priority !== null && !VALID_PRIORITY.has(priority)) {
     throw err;
   }
-}
-
-function validateDueDate(dueDate) {
-  if (dueDate === undefined || dueDate === null || dueDate === '') return null;
-  if (typeof dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
-    const err = new Error('Invalid due date');
-    err.code = 'INVALID_DUE_DATE';
-    throw err;
-  }
-
-  const parsed = new Date(`${dueDate}T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== dueDate) {
-    const err = new Error('Invalid due date');
-    err.code = 'INVALID_DUE_DATE';
-    throw err;
-  }
-
-  return dueDate;
 }
 
 async function createTodo(userId, { title, description, category, status, priority, due_date }) {

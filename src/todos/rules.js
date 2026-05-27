@@ -12,6 +12,24 @@ const VALID_SORT_BY = new Set([
 const DEFAULT_TODO_STATUS = 'pending';
 const DEFAULT_TODO_PRIORITY = 'medium';
 
+function validateDueDate(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const err = new Error('Invalid due date');
+    err.code = 'INVALID_DUE_DATE';
+    throw err;
+  }
+
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    const err = new Error('Invalid due date');
+    err.code = 'INVALID_DUE_DATE';
+    throw err;
+  }
+
+  return value;
+}
+
 function parseOptionalNonNegativeInt(v) {
   if (v === undefined || v === null) return undefined;
   const n = Number.parseInt(v, 10);
@@ -32,4 +50,5 @@ module.exports = {
   VALID_STATUS,
   normalizeSortBy,
   parseOptionalNonNegativeInt,
+  validateDueDate,
 };
