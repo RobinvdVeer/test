@@ -52,32 +52,46 @@ async function runDailyReminderBatch({ pool, config, fetchImpl = fetch, now = ()
   const window = getReminderWindow(now(), config.lookaheadDays || 0);
   const rows = await selectReminderCandidates(pool, window.startDate, window.endDate);
   const recipients = groupTodosByUser(rows);
+  const MAX_CONCURRENT_SENDS = 5;
+  const recipientEntries = Array.from(recipients.entries());
   let sent = 0;
 
-  for (const [userId, recipient] of recipients.entries()) {
-    const subject = buildReminderSubject(window.startDate, window.endDate);
-    const text = buildReminderText({
-      appBaseUrl: config.appBaseUrl,
-      recipientEmail: recipient.email,
-      todos: recipient.todos,
-      startDate: window.startDate,
-      endDate: window.endDate,
-    });
+  for (let index = 0; index < recipientEntries.length; index += MAX_CONCURRENT_SENDS) {
+    const batch = recipientEntries.slice(index, index + MAX_CONCURRENT_SENDS);
+    const results = await Promise.allSettled(
+      batch.map(async ([userId, recipient]) => {
+        const subject = buildReminderSubject(window.startDate, window.endDate);
+        const text = buildReminderText({
+          appBaseUrl: config.appBaseUrl,
+          recipientEmail: recipient.email,
+          todos: recipient.todos,
+          startDate: window.startDate,
+          endDate: window.endDate,
+        });
 
-    try {
-      await sendReminderEmail({
-        fetchImpl,
-        sendUrl: config.sendUrl,
-        apiKey: config.apiKey,
-        from: config.from,
-        to: recipient.email,
-        subject,
-        text,
-      });
-      sent += 1;
-    } catch (error) {
-      logger.error('Error sending reminder email:', { userId, error });
-    }
+        await sendReminderEmail({
+          fetchImpl,
+          sendUrl: config.sendUrl,
+          apiKey: config.apiKey,
+          from: config.from,
+          to: recipient.email,
+          subject,
+          text,
+        });
+
+        return userId;
+      })
+    );
+
+    results.forEach((result, batchIndex) => {
+      if (result.status === 'fulfilled') {
+        sent += 1;
+        return;
+      }
+
+      const [userId] = batch[batchIndex];
+      logger.error('Error sending reminder email:', { userId, error: result.reason });
+    });
   }
 
   return { sent, skipped: false, recipients: recipients.size };
