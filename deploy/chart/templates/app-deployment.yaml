@@ -63,6 +63,18 @@ spec:
               value: {{ .Values.app.auth.postLogoutRedirectUri | quote }}
             - name: AUTH_SCOPE
               value: {{ .Values.app.auth.scope | quote }}
+            - name: APP_BASE_URL
+              value: {{ .Values.app.publicUrl | quote }}
+            - name: DAILY_REMINDER_EMAIL_SEND_URL
+              value: {{ .Values.app.reminders.sendUrl | quote }}
+            - name: DAILY_REMINDER_EMAIL_FROM
+              value: {{ .Values.app.reminders.from | quote }}
+            - name: DAILY_REMINDER_EMAIL_API_KEY
+              value: {{ .Values.app.reminders.apiKey | quote }}
+            - name: DAILY_REMINDER_RUN_AT
+              value: {{ .Values.app.reminders.runAtUtc | quote }}
+            - name: DAILY_REMINDER_LOOKAHEAD_DAYS
+              value: {{ .Values.app.reminders.lookaheadDays | quote }}
           readinessProbe:
             httpGet:
               path: /health

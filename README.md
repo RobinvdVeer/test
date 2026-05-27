@@ -7,6 +7,7 @@ A multi-user todo and metrics app with Keycloak auth, PostgreSQL, and a minimal 
 - JWT bearer auth on todo APIs
 - Users only see their own todos
 - PostgreSQL-backed persistence
+- Optional daily email reminders for upcoming todos
 - Docker Compose and Helm support
 - Public health and OpenAPI routes
 
@@ -34,9 +35,9 @@ Open:
 - `GET /openapi.json` – public OpenAPI doc
 - `GET /metrics` – public metrics
 - `GET /todos` – list current user todos
-- `POST /todos` – create todo
+- `POST /todos` – create todo (optional `due_date`)
 - `GET /todos/:id` – get todo
-- `PUT /todos/:id` – update todo
+- `PUT /todos/:id` – update todo (including `due_date`)
 - `DELETE /todos/:id` – delete todo
 
 ## Environment
@@ -56,6 +57,12 @@ See `.env.example` for the full local Docker Compose configuration.
 - `KEYCLOAK_CLIENT_ID`
 - `AUTH_REDIRECT_URI`
 - `AUTH_POST_LOGOUT_REDIRECT_URI`
+- `DAILY_REMINDER_EMAIL_SEND_URL`
+- `DAILY_REMINDER_EMAIL_FROM`
+- `DAILY_REMINDER_EMAIL_API_KEY`
+- `DAILY_REMINDER_RUN_AT`
+- `DAILY_REMINDER_LOOKAHEAD_DAYS`
+- `APP_BASE_URL`
 
 ## Notes
 - Todo ownership is derived from the JWT `sub` claim.

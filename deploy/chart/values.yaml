@@ -45,6 +45,12 @@ app:
     redirectUri: http://localhost:3000/auth/callback
     postLogoutRedirectUri: http://localhost:3000/login
     scope: openid profile email
+  reminders:
+    sendUrl: ""
+    from: ""
+    apiKey: ""
+    runAtUtc: 08:00
+    lookaheadDays: 3
 
 secrets:
   create: false

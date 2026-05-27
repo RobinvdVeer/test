@@ -26,6 +26,7 @@ async function authMiddleware(req, res, next) {
   }
 
   req.userId = payload.sub;
+  req.userEmail = typeof payload.email === 'string' && payload.email.trim() ? payload.email.trim() : undefined;
   next();
 }
 

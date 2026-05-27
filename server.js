@@ -1,6 +1,7 @@
 const { createApp } = require('./src/app');
 const { getConfig } = require('./src/config');
 const { getPool, closePool } = require('./src/db/pool');
+const { startDailyReminderScheduler } = require('./src/jobs/dailyReminders');
 
 const { PORT } = getConfig();
 
@@ -9,6 +10,7 @@ let pool;
 const app = createApp();
 
 let server;
+let reminderScheduler;
 
 if (require.main === module) {
   if (!process.env.DATABASE_URL) {
@@ -17,6 +19,10 @@ if (require.main === module) {
   }
 
   pool = getPool();
+  reminderScheduler = startDailyReminderScheduler({
+    pool,
+    config: getConfig().reminders,
+  });
 
   server = app.listen(PORT, () => {
     console.log(`Todo app running on http://localhost:${PORT}`);
@@ -31,6 +37,9 @@ if (require.main === module) {
 
     server.close(() => {
       console.log('HTTP server closed');
+      if (reminderScheduler) {
+        reminderScheduler.stop();
+      }
       closePool()
         .then(() => {
           console.log('Database pool closed');

@@ -98,22 +98,46 @@ function validateStatusPriority({ status, priority }) {
   }
 }
 
-async function createTodo(userId, { title, description, category, status, priority }) {
+function validateDueDate(dueDate) {
+  if (dueDate === undefined || dueDate === null || dueDate === '') return null;
+  if (typeof dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+    const err = new Error('Invalid due date');
+    err.code = 'INVALID_DUE_DATE';
+    throw err;
+  }
+
+  const parsed = new Date(`${dueDate}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== dueDate) {
+    const err = new Error('Invalid due date');
+    err.code = 'INVALID_DUE_DATE';
+    throw err;
+  }
+
+  return dueDate;
+}
+
+async function createTodo(userId, { title, description, category, status, priority, due_date }) {
   const statusToUse = status || DEFAULT_TODO_STATUS;
   const priorityToUse = priority || DEFAULT_TODO_PRIORITY;
+  const dueDateToUse = validateDueDate(due_date);
 
   validateStatusPriority({ status: statusToUse, priority: priorityToUse });
 
+  const columns = ['user_id', 'title', 'description', 'category', 'status', 'priority'];
+  const values = [userId, title, description || null, category || null, statusToUse, priorityToUse];
+
+  if (dueDateToUse !== null) {
+    columns.push('due_date');
+    values.push(dueDateToUse);
+  }
+
+  columns.push('last_viewed');
+
+  const placeholders = columns.map((_, index) => (index === columns.length - 1 ? 'NOW()' : `$${index + 1}`));
+
   const result = await getPool().query(
-    'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
-    [
-      userId,
-      title,
-      description || null,
-      category || null,
-      statusToUse,
-      priorityToUse,
-    ]
+    `INSERT INTO todos (${columns.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`,
+    values
   );
 
   return result.rows[0];
@@ -142,7 +166,7 @@ WHERE id = $1 AND user_id = $2
   return result.rows[0] || null;
 }
 
-async function updateTodo(userId, id, { title, description, category, status, priority }) {
+async function updateTodo(userId, id, { title, description, category, status, priority, due_date }) {
   validateStatusPriority({ status, priority });
 
   // Update only provided fields
@@ -169,6 +193,10 @@ async function updateTodo(userId, id, { title, description, category, status, pr
   if (priority !== undefined) {
     updateFields.push(`priority = $${paramCount++}`);
     updateValues.push(priority);
+  }
+  if (due_date !== undefined) {
+    updateFields.push(`due_date = $${paramCount++}`);
+    updateValues.push(validateDueDate(due_date));
   }
 
   if (updateFields.length === 0) {
