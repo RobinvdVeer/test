@@ -716,6 +716,41 @@ describe('PUT /todos/:id', () => {
     );
   });
 
+  test('rejects invalid due_date values on update', async () => {
+    const app = loadApp();
+    queryMock.mockResolvedValueOnce({ rows: [] });
+
+    await request(app)
+      .put('/todos/7')
+      .set(authForUser('u1'))
+      .send({ due_date: 'not-a-date' })
+      .expect(400, { error: 'Invalid due_date' });
+
+    expect(queryMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('clears due_date when null is provided', async () => {
+    const app = loadApp();
+    const row = { id: 7, title: 'updated', due_date: null };
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .put('/todos/7')
+      .set(authForUser('u1'))
+      .send({ due_date: null })
+      .expect(200);
+
+    expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'UPDATE todos SET due_date = $1, updated_at = NOW(), last_viewed = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
+      [null, '7', 'u1']
+    );
+  });
+
   test('returns 500 when update query fails', async () => {
     const app = loadApp();
     queryMock
