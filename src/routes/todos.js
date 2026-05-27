@@ -1,7 +1,6 @@
 const express = require('express');
 const {
   listTodos,
-  getTodoSummary,
   createTodo,
   getTodoAndUpdateLastViewed,
   updateTodo,
@@ -48,11 +47,12 @@ function registerTodosRoutes() {
   router.get(
     '/',
     withErrorHandling('Error fetching todos:', async (req, res) => {
-      const { category, status, sort_by, limit, offset } = req.query;
+      const { category, status, q, sort_by, limit, offset } = req.query;
 
       const result = await listTodos(req.userId, {
         category,
         status,
+        q,
         sort_by: normalizeSortBy(sort_by),
         limit: parseOptionalNonNegativeInt(limit),
         offset: parseOptionalNonNegativeInt(offset),
@@ -84,16 +84,6 @@ function registerTodosRoutes() {
       });
 
       res.status(201).json(result);
-    })
-  );
-
-  // GET /todos/summary - Lightweight dashboard counts for the current user
-  router.get(
-    '/summary',
-    withErrorHandling('Error fetching todo summary:', async (req, res) => {
-      const { category, status, q } = req.query;
-      const result = await getTodoSummary(req.userId, { category, status, q });
-      res.json(result);
     })
   );
 

@@ -130,23 +130,7 @@ FROM todos WHERE user_id = $1`;
   ({ query, paramCount } = appendTextSearchFilter(query, params, paramCount, q));
 
   const result = await getPool().query(query, params);
-  const row = result.rows[0] || {};
-
-  return {
-    total: Number(row.total || 0),
-    status_counts: {
-      pending: Number(row.pending || 0),
-      in_progress: Number(row.in_progress || 0),
-      completed: Number(row.completed || 0),
-    },
-    priority_counts: {
-      low: Number(row.low || 0),
-      medium: Number(row.medium || 0),
-      high: Number(row.high || 0),
-    },
-    latest_created_at: row.latest_created_at || null,
-    latest_updated_at: row.latest_updated_at || null,
-  };
+  return result.rows[0] || null;
 }
 
 function validateStatusPriority({ status, priority }) {
