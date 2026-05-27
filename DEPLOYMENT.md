@@ -305,6 +305,18 @@ DATABASE_URL=postgresql://todouser:change-me@localhost:5432/tododb
 NODE_ENV=development
 ```
 
+### Optional daily reminder job
+The reminder job is a no-op unless both `DAILY_REMINDER_EMAIL_SEND_URL` and `DAILY_REMINDER_EMAIL_FROM` are set.
+
+```
+APP_BASE_URL=http://localhost:3000
+DAILY_REMINDER_EMAIL_SEND_URL=https://mail.example.com/send
+DAILY_REMINDER_EMAIL_FROM=todo-app@example.com
+DAILY_REMINDER_EMAIL_API_KEY=
+DAILY_REMINDER_RUN_AT=08:00
+DAILY_REMINDER_LOOKAHEAD_DAYS=3
+```
+
 ### Production
 ```
 PORT=3000
@@ -316,6 +328,18 @@ AUTH_REDIRECT_URI=https://app.example.com/auth/callback
 AUTH_POST_LOGOUT_REDIRECT_URI=https://app.example.com/login
 NODE_ENV=production
 LOG_LEVEL=info
+```
+
+### Optional daily reminder job
+The reminder job is a no-op unless both `DAILY_REMINDER_EMAIL_SEND_URL` and `DAILY_REMINDER_EMAIL_FROM` are set.
+
+```
+APP_BASE_URL=https://app.example.com
+DAILY_REMINDER_EMAIL_SEND_URL=https://mail.example.com/send
+DAILY_REMINDER_EMAIL_FROM=todo-app@example.com
+DAILY_REMINDER_EMAIL_API_KEY=
+DAILY_REMINDER_RUN_AT=08:00
+DAILY_REMINDER_LOOKAHEAD_DAYS=3
 ```
 
 For Docker Compose, copy `.env.example` to `.env` and set `POSTGRES_PASSWORD`, `KEYCLOAK_POSTGRES_PASSWORD`, and `KEYCLOAK_ADMIN_PASSWORD`; `DATABASE_URL` is optional and defaults from the PostgreSQL variables.
