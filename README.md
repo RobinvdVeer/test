@@ -7,6 +7,7 @@ A multi-user todo and metrics app with Keycloak auth, PostgreSQL, and a minimal 
 - JWT bearer auth on todo APIs
 - Users only see their own todos
 - PostgreSQL-backed persistence
+- Search, filters, and a todo summary dashboard
 - Docker Compose and Helm support
 - Public health and OpenAPI routes
 
@@ -34,6 +35,7 @@ Open:
 - `GET /openapi.json` – public OpenAPI doc
 - `GET /metrics` – public metrics
 - `GET /todos` – list current user todos
+- `GET /todos/summary` – todo counts dashboard data
 - `POST /todos` – create todo
 - `GET /todos/:id` – get todo
 - `PUT /todos/:id` – update todo

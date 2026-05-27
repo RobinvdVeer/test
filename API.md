@@ -60,11 +60,23 @@ GET /metrics
 ```
 Returns process uptime, memory usage, and CPU usage.
 
+### Todo Summary
+```
+GET /todos/summary
+```
+Returns per-status and per-priority counts for the current user. Supports the same `q`, `category`, and `status` filters as the list endpoint.
+
+Example:
+```bash
+curl -H "Authorization: Bearer $ACCESS_TOKEN" "http://localhost:3000/todos/summary?q=build"
+```
+
 ### List Todos
 ```
 GET /todos
 ```
 Query parameters:
+- `q` - Search title, description, and category text
 - `category` - Filter by category
 - `status` - Filter by status (pending, in_progress, completed)
 - `sort_by` - Sort order: `created_asc`, `created_desc`, `updated_asc`, `updated_desc`, `last_viewed_asc`, `last_viewed_desc` (default)

@@ -425,6 +425,22 @@ describe('GET /todos', () => {
     );
   });
 
+  test('applies text search filter with parameterized SQL', async () => {
+    const app = loadApp();
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+
+    await request(app)
+      .get('/todos?q=build&category=work')
+      .set(authForUser('u1'))
+      .expect(200);
+
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      "SELECT * FROM todos WHERE user_id = $1 AND category = $2 AND (title ILIKE $3 ESCAPE '\\' OR COALESCE(description, '') ILIKE $3 ESCAPE '\\' OR COALESCE(category, '') ILIKE $3 ESCAPE '\\') ORDER BY last_viewed DESC LIMIT $4 OFFSET $5",
+      ['u1', 'work', '%build%', 50, 0]
+    );
+  });
+
   test('returns 500 when the list query fails', async () => {
     const app = loadApp();
     queryMock
@@ -437,6 +453,60 @@ describe('GET /todos', () => {
       .expect(500, { error: 'Internal server error' });
   });
 });
+
+describe('GET /todos/summary', () => {
+  test('returns aggregate counts for the current user', async () => {
+    const app = loadApp();
+    const row = {
+      total: '3',
+      pending: '1',
+      in_progress: '1',
+      completed: '1',
+      low: '0',
+      medium: '2',
+      high: '1',
+      latest_created_at: '2024-01-01T00:00:00.000Z',
+      latest_updated_at: '2024-01-02T00:00:00.000Z',
+    };
+
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app).get('/todos/summary?q=build').set(authForUser('u1')).expect(200);
+
+    expect(res.body).toEqual({
+      total: 3,
+      status_counts: {
+        pending: 1,
+        in_progress: 1,
+        completed: 1,
+      },
+      priority_counts: {
+        low: 0,
+        medium: 2,
+        high: 1,
+      },
+      latest_created_at: '2024-01-01T00:00:00.000Z',
+      latest_updated_at: '2024-01-02T00:00:00.000Z',
+    });
+
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      `SELECT
+  COUNT(*)::int AS total,
+  COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+  COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
+  COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+  COUNT(*) FILTER (WHERE priority = 'low')::int AS low,
+  COUNT(*) FILTER (WHERE priority = 'medium')::int AS medium,
+  COUNT(*) FILTER (WHERE priority = 'high')::int AS high,
+  MAX(created_at) AS latest_created_at,
+  MAX(updated_at) AS latest_updated_at
+FROM todos WHERE user_id = $1 AND (title ILIKE $2 ESCAPE '\\' OR COALESCE(description, '') ILIKE $2 ESCAPE '\\' OR COALESCE(category, '') ILIKE $2 ESCAPE '\\')`,
+      ['u1', '%build%']
+    );
+  });
+});
+
 
 describe('POST /todos', () => {
   test.each([{}, { title: '' }])('rejects missing or empty title: %p', async (body) => {

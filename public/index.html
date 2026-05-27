@@ -15,6 +15,15 @@
       li { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 10px 0; }
       .todo-title { font-weight: 600; }
       .todo-meta { font-size: 0.9rem; color: #555; }
+      .dashboard { margin-top: 20px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fafafa; }
+      .summary-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+      .summary-card { padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: white; }
+      .summary-card strong { display: block; font-size: 1.35rem; margin-top: 4px; }
+      .summary-meta { margin-top: 12px; font-size: 0.95rem; }
+      .filters { padding: 16px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; }
+      .filters .field { min-width: 180px; flex: 1 1 180px; }
+      .filters .field.small { flex-basis: 120px; min-width: 120px; }
+      .actions { display: flex; gap: 12px; flex-wrap: wrap; }
       .danger { color: #b00020; }
     </style>
   </head>
@@ -30,7 +39,46 @@
     <main>
       <section id="status" class="muted"></section>
 
+      <section class="dashboard">
+        <h2>Dashboard</h2>
+        <div id="summary" class="muted">Loading your todo summary…</div>
+      </section>
+
+      <section class="filters">
+        <h2>Find todos</h2>
+        <form id="filters-form">
+          <div class="row">
+            <input id="search" class="field" name="q" placeholder="Search title, description, category" />
+            <input id="filter-category" class="field" name="category" placeholder="Category" />
+            <select id="filter-status" class="field small" name="status">
+              <option value="">all status</option>
+              <option value="pending">pending</option>
+              <option value="in_progress">in_progress</option>
+              <option value="completed">completed</option>
+            </select>
+            <select id="sort-by" class="field small" name="sort_by">
+              <option value="last_viewed_desc">recently viewed</option>
+              <option value="last_viewed_asc">least recently viewed</option>
+              <option value="created_desc">newest</option>
+              <option value="created_asc">oldest</option>
+              <option value="updated_desc">recently updated</option>
+              <option value="updated_asc">least recently updated</option>
+            </select>
+            <select id="limit" class="field small" name="limit">
+              <option value="25">25</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div class="actions">
+            <button type="submit">Apply filters</button>
+            <button type="button" id="clear-filters">Reset filters</button>
+          </div>
+        </form>
+      </section>
+
       <form id="todo-form">
+        <h2>Add a todo</h2>
         <input id="title" name="title" placeholder="Title" required />
         <textarea id="description" name="description" placeholder="Description"></textarea>
         <div class="row">

@@ -6,23 +6,59 @@ const {
   VALID_STATUS,
 } = require('../todos/rules');
 
-async function listTodos(userId, { category, status, sort_by, limit, offset }) {
-  let query = 'SELECT * FROM todos WHERE user_id = $1';
-  const params = [userId];
-  let paramCount = 1;
+function escapeLikePattern(value) {
+  return String(value).replace(/[\\%_]/g, '\\$&');
+}
 
+function appendTextSearchFilter(query, params, paramCount, q) {
+  const trimmedQuery = typeof q === 'string' ? q.trim() : '';
+  if (!trimmedQuery) {
+    return { query, paramCount };
+  }
+
+  paramCount += 1;
+  query += ` AND (title ILIKE $${paramCount} ESCAPE '\\' OR COALESCE(description, '') ILIKE $${paramCount} ESCAPE '\\' OR COALESCE(category, '') ILIKE $${paramCount} ESCAPE '\\')`;
+  params.push(`%${escapeLikePattern(trimmedQuery)}%`);
+
+  return { query, paramCount };
+}
+
+function appendCategoryStatusFilters(query, params, paramCount, { category, status }) {
   if (category) {
-    paramCount++;
+    paramCount += 1;
     query += ` AND category = $${paramCount}`;
     params.push(category);
   }
 
   if (status) {
-    paramCount++;
+    paramCount += 1;
     query += ` AND status = $${paramCount}`;
     params.push(status);
   }
 
+  return { query, paramCount };
+}
+
+function applyListOrdering(query, sort_by) {
+  const sortOption = sort_by || 'last_viewed_desc';
+  switch (sortOption) {
+    case 'created_asc':
+      return `${query} ORDER BY created_at ASC`;
+    case 'created_desc':
+      return `${query} ORDER BY created_at DESC`;
+    case 'updated_asc':
+      return `${query} ORDER BY updated_at ASC`;
+    case 'updated_desc':
+      return `${query} ORDER BY updated_at DESC`;
+    case 'last_viewed_asc':
+      return `${query} ORDER BY last_viewed ASC`;
+    case 'last_viewed_desc':
+    default:
+      return `${query} ORDER BY last_viewed DESC`;
+  }
+}
+
+function applyPagination(query, params, paramCount, { limit, offset }) {
   // Route parsing turns:
   // - missing/invalid limit/offset into `undefined`
   // - valid numbers into integers
@@ -31,29 +67,6 @@ async function listTodos(userId, { category, status, sort_by, limit, offset }) {
 
   const DEFAULT_LIMIT = 50;
   const MAX_LIMIT = 100;
-
-  // Default sort by last_viewed (most recently viewed first)
-  const sortOption = sort_by || 'last_viewed_desc';
-  switch (sortOption) {
-    case 'created_asc':
-      query += ' ORDER BY created_at ASC';
-      break;
-    case 'created_desc':
-      query += ' ORDER BY created_at DESC';
-      break;
-    case 'updated_asc':
-      query += ' ORDER BY updated_at ASC';
-      break;
-    case 'updated_desc':
-      query += ' ORDER BY updated_at DESC';
-      break;
-    case 'last_viewed_asc':
-      query += ' ORDER BY last_viewed ASC';
-      break;
-    case 'last_viewed_desc':
-    default:
-      query += ' ORDER BY last_viewed DESC';
-  }
 
   // Pagination semantics (asserted by tests):
   // - If LIMIT is missing and OFFSET is also missing => apply defaults (50, 0)
@@ -81,8 +94,59 @@ async function listTodos(userId, { category, status, sort_by, limit, offset }) {
     params.push(safeOffset);
   }
 
+  return { query, params };
+}
+
+async function listTodos(userId, { category, status, q, sort_by, limit, offset }) {
+  let query = 'SELECT * FROM todos WHERE user_id = $1';
+  let params = [userId];
+  let paramCount = 1;
+
+  ({ query, paramCount } = appendCategoryStatusFilters(query, params, paramCount, { category, status }));
+  ({ query, paramCount } = appendTextSearchFilter(query, params, paramCount, q));
+  query = applyListOrdering(query, sort_by);
+  ({ query, params } = applyPagination(query, params, paramCount, { limit, offset }));
+
   const result = await getPool().query(query, params);
   return result.rows;
+}
+
+async function getTodoSummary(userId, { category, status, q }) {
+  let query = `SELECT
+  COUNT(*)::int AS total,
+  COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+  COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
+  COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+  COUNT(*) FILTER (WHERE priority = 'low')::int AS low,
+  COUNT(*) FILTER (WHERE priority = 'medium')::int AS medium,
+  COUNT(*) FILTER (WHERE priority = 'high')::int AS high,
+  MAX(created_at) AS latest_created_at,
+  MAX(updated_at) AS latest_updated_at
+FROM todos WHERE user_id = $1`;
+  const params = [userId];
+  let paramCount = 1;
+
+  ({ query, paramCount } = appendCategoryStatusFilters(query, params, paramCount, { category, status }));
+  ({ query, paramCount } = appendTextSearchFilter(query, params, paramCount, q));
+
+  const result = await getPool().query(query, params);
+  const row = result.rows[0] || {};
+
+  return {
+    total: Number(row.total || 0),
+    status_counts: {
+      pending: Number(row.pending || 0),
+      in_progress: Number(row.in_progress || 0),
+      completed: Number(row.completed || 0),
+    },
+    priority_counts: {
+      low: Number(row.low || 0),
+      medium: Number(row.medium || 0),
+      high: Number(row.high || 0),
+    },
+    latest_created_at: row.latest_created_at || null,
+    latest_updated_at: row.latest_updated_at || null,
+  };
 }
 
 function validateStatusPriority({ status, priority }) {
@@ -201,6 +265,7 @@ async function deleteTodo(userId, id) {
 
 module.exports = {
   listTodos,
+  getTodoSummary,
   createTodo,
   getTodoAndUpdateLastViewed,
   updateTodo,

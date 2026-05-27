@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   listTodos,
+  getTodoSummary,
   createTodo,
   getTodoAndUpdateLastViewed,
   updateTodo,
@@ -83,6 +84,16 @@ function registerTodosRoutes() {
       });
 
       res.status(201).json(result);
+    })
+  );
+
+  // GET /todos/summary - Lightweight dashboard counts for the current user
+  router.get(
+    '/summary',
+    withErrorHandling('Error fetching todo summary:', async (req, res) => {
+      const { category, status, q } = req.query;
+      const result = await getTodoSummary(req.userId, { category, status, q });
+      res.json(result);
     })
   );
 
