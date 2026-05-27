@@ -58,7 +58,15 @@ curl http://localhost:3000/openapi.json
 ```
 GET /metrics
 ```
-Returns process uptime, memory usage, and CPU usage.
+Returns process uptime details only:
+```json
+{
+  "uptime": 123.4,
+  "uptime_seconds": 123,
+  "uptime_readable": "2m 3s",
+  "timestamp": "2024-01-15T14:20:00.000Z"
+}
+```
 
 ### List Todos
 ```
@@ -85,6 +93,7 @@ Response:
     "category": "work",
     "status": "pending",
     "priority": "high",
+    "due_date": "2024-01-20",
     "created_at": "2024-01-15T10:30:00Z",
     "updated_at": "2024-01-15T10:30:00Z",
     "last_viewed": "2024-01-15T14:20:00Z"
@@ -102,7 +111,8 @@ Content-Type: application/json
   "description": "Milk, eggs, bread",
   "category": "personal",
   "status": "pending",
-  "priority": "medium"
+  "priority": "medium",
+  "due_date": "2024-01-20"
 }
 ```
 
@@ -111,6 +121,7 @@ Content-Type: application/json
 - `category` - Optional
 - `status` - Optional; one of `pending`, `in_progress`, `completed` (default: `pending`)
 - `priority` - Optional; one of `low`, `medium`, `high` (default: `medium`)
+- `due_date` - Optional; ISO date (`YYYY-MM-DD`), or `null`
 
 Response: `201 Created` with the created todo object.
 
@@ -130,6 +141,7 @@ Response:
   "category": "work",
   "status": "pending",
   "priority": "high",
+  "due_date": "2024-01-20",
   "created_at": "2024-01-15T10:30:00Z",
   "updated_at": "2024-01-15T10:30:00Z",
   "last_viewed": "2024-01-15T14:25:00Z"
@@ -143,11 +155,12 @@ Content-Type: application/json
 
 {
   "status": "completed",
-  "priority": "low"
+  "priority": "low",
+  "due_date": "2024-01-20"
 }
 ```
 
-All fields are optional. Only provided fields are updated. If supplied, `status` must be one of `pending`, `in_progress`, `completed`, and `priority` must be one of `low`, `medium`, `high`. The `updated_at` and `last_viewed` timestamps are automatically updated.
+All fields are optional. Only provided fields are updated. If supplied, `status` must be one of `pending`, `in_progress`, `completed`, and `priority` must be one of `low`, `medium`, `high`; `due_date` must be an ISO date (`YYYY-MM-DD`) or `null`. The `updated_at` and `last_viewed` timestamps are automatically updated.
 
 Response: Updated todo object with status `200 OK`.
 
@@ -173,6 +186,7 @@ Response: `200 OK` with deleted todo details.
 - `category` - Category/tag for organizing todos
 - `status` - Todo status (`pending`, `in_progress`, or `completed`)
 - `priority` - Priority level (`low`, `medium`, or `high`)
+- `due_date` - Optional due date (`YYYY-MM-DD`)
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
 - `last_viewed` - Last time the todo was viewed or updated (used for "forgotten items" insights)
