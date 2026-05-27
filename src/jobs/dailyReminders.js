@@ -31,15 +31,20 @@ function getNextRunDelayMs(now, runAtUtc) {
   return nextRun.getTime() - now.getTime();
 }
 
-function groupTodosByEmail(rows) {
+function groupTodosByUser(rows) {
   const recipients = new Map();
 
   for (const row of rows) {
-    if (!row.email) continue;
-    if (!recipients.has(row.email)) {
-      recipients.set(row.email, []);
+    if (!row.email || !row.user_id) continue;
+
+    if (!recipients.has(row.user_id)) {
+      recipients.set(row.user_id, {
+        email: row.email,
+        todos: [],
+      });
     }
-    recipients.get(row.email).push(row);
+
+    recipients.get(row.user_id).todos.push(row);
   }
 
   return recipients;
@@ -113,15 +118,15 @@ ORDER BY u.email ASC, t.due_date ASC, t.id ASC`,
     [startDate, endDate]
   );
 
-  const recipients = groupTodosByEmail(queryResult.rows || []);
+  const recipients = groupTodosByUser(queryResult.rows || []);
   let sent = 0;
 
-  for (const [email, todos] of recipients.entries()) {
+  for (const [userId, recipient] of recipients.entries()) {
     const subject = buildReminderSubject(startDate, endDate);
     const text = buildReminderText({
       appBaseUrl: config.appBaseUrl,
-      recipientEmail: email,
-      todos,
+      recipientEmail: recipient.email,
+      todos: recipient.todos,
       startDate,
       endDate,
     });
@@ -132,13 +137,13 @@ ORDER BY u.email ASC, t.due_date ASC, t.id ASC`,
         sendUrl: config.sendUrl,
         apiKey: config.apiKey,
         from: config.from,
-        to: email,
+        to: recipient.email,
         subject,
         text,
       });
       sent += 1;
     } catch (error) {
-      logger.error('Error sending reminder email:', { email, error });
+      logger.error('Error sending reminder email:', { userId, error });
     }
   }
 

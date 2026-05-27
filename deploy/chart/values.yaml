@@ -48,7 +48,8 @@ app:
   reminders:
     sendUrl: ""
     from: ""
-    apiKey: ""
+    secretName: metrics-server-reminders
+    secretKey: email-api-key
     runAtUtc: 08:00
     lookaheadDays: 3
 

@@ -42,7 +42,7 @@ export async function completeLoginFromCallback() {
   const token = await response.json();
   const expiresIn = Number(token.expires_in || 0);
   setStoredAuth({
-    ...token,
+    access_token: token.access_token,
     expires_at: Date.now() + expiresIn * 1000,
   });
 
