@@ -32,6 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_todos_user_category_last_viewed ON todos(user_id,
 CREATE INDEX IF NOT EXISTS idx_todos_user_created_at ON todos(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_updated_at ON todos(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_due_date ON todos(user_id, due_date);
+CREATE INDEX IF NOT EXISTS idx_todos_due_date_pending ON todos(due_date) WHERE due_date IS NOT NULL AND status <> 'completed';
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_due_date ON todos(user_id, status, due_date);
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_created_at ON todos(user_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_updated_at ON todos(user_id, status, updated_at);

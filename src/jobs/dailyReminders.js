@@ -114,32 +114,46 @@ ORDER BY u.email ASC, t.due_date ASC, t.id ASC`,
   );
 
   const recipients = groupTodosByEmail(queryResult.rows || []);
+  const MAX_CONCURRENT_SENDS = 5;
+  const recipientEntries = Array.from(recipients.entries());
   let sent = 0;
 
-  for (const [email, todos] of recipients.entries()) {
-    const subject = buildReminderSubject(startDate, endDate);
-    const text = buildReminderText({
-      appBaseUrl: config.appBaseUrl,
-      recipientEmail: email,
-      todos,
-      startDate,
-      endDate,
-    });
+  for (let index = 0; index < recipientEntries.length; index += MAX_CONCURRENT_SENDS) {
+    const batch = recipientEntries.slice(index, index + MAX_CONCURRENT_SENDS);
+    const results = await Promise.allSettled(
+      batch.map(async ([email, todos]) => {
+        const subject = buildReminderSubject(startDate, endDate);
+        const text = buildReminderText({
+          appBaseUrl: config.appBaseUrl,
+          recipientEmail: email,
+          todos,
+          startDate,
+          endDate,
+        });
 
-    try {
-      await sendReminderEmail({
-        fetchImpl,
-        sendUrl: config.sendUrl,
-        apiKey: config.apiKey,
-        from: config.from,
-        to: email,
-        subject,
-        text,
-      });
-      sent += 1;
-    } catch (error) {
-      logger.error('Error sending reminder email:', { email, error });
-    }
+        await sendReminderEmail({
+          fetchImpl,
+          sendUrl: config.sendUrl,
+          apiKey: config.apiKey,
+          from: config.from,
+          to: email,
+          subject,
+          text,
+        });
+
+        return email;
+      })
+    );
+
+    results.forEach((result, batchIndex) => {
+      if (result.status === 'fulfilled') {
+        sent += 1;
+        return;
+      }
+
+      const [email] = batch[batchIndex];
+      logger.error('Error sending reminder email:', { email, error: result.reason });
+    });
   }
 
   return { sent, skipped: false, recipients: recipients.size };
