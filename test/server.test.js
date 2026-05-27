@@ -425,19 +425,19 @@ describe('GET /todos', () => {
     );
   });
 
-  test('applies text search filter with parameterized SQL', async () => {
+  test('trims and escapes q filter before parameterizing SQL', async () => {
     const app = loadApp();
     queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
 
     await request(app)
-      .get('/todos?q=build&category=work')
+      .get('/todos?q=%20%20100%25_%5Ctest%20%20&category=work&status=pending')
       .set(authForUser('u1'))
       .expect(200);
 
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      "SELECT * FROM todos WHERE user_id = $1 AND category = $2 AND (title ILIKE $3 ESCAPE '\\' OR COALESCE(description, '') ILIKE $3 ESCAPE '\\' OR COALESCE(category, '') ILIKE $3 ESCAPE '\\') ORDER BY last_viewed DESC LIMIT $4 OFFSET $5",
-      ['u1', 'work', '%build%', 50, 0]
+      "SELECT * FROM todos WHERE user_id = $1 AND category = $2 AND status = $3 AND (title ILIKE $4 ESCAPE '\\' OR COALESCE(description, '') ILIKE $4 ESCAPE '\\' OR COALESCE(category, '') ILIKE $4 ESCAPE '\\') ORDER BY last_viewed DESC LIMIT $5 OFFSET $6",
+      ['u1', 'work', 'pending', '%100\\%\\_\\\\test%', 50, 0]
     );
   });
 
@@ -504,6 +504,42 @@ describe('GET /todos/summary', () => {
 FROM todos WHERE user_id = $1 AND (title ILIKE $2 ESCAPE '\\' OR COALESCE(description, '') ILIKE $2 ESCAPE '\\' OR COALESCE(category, '') ILIKE $2 ESCAPE '\\')`,
       ['u1', '%build%']
     );
+  });
+
+  test('forwards category, status, and escaped q filters to the summary query', async () => {
+    const app = loadApp();
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+
+    await request(app)
+      .get('/todos/summary?category=work&status=pending&q=%20%20100%25_%5Ctest%20%20')
+      .set(authForUser('u1'))
+      .expect(200);
+
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      `SELECT
+  COUNT(*)::int AS total,
+  COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+  COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
+  COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+  COUNT(*) FILTER (WHERE priority = 'low')::int AS low,
+  COUNT(*) FILTER (WHERE priority = 'medium')::int AS medium,
+  COUNT(*) FILTER (WHERE priority = 'high')::int AS high,
+  MAX(created_at) AS latest_created_at,
+  MAX(updated_at) AS latest_updated_at
+FROM todos WHERE user_id = $1 AND category = $2 AND status = $3 AND (title ILIKE $4 ESCAPE '\\' OR COALESCE(description, '') ILIKE $4 ESCAPE '\\' OR COALESCE(category, '') ILIKE $4 ESCAPE '\\')`,
+      ['u1', 'work', 'pending', '%100\\%\\_\\\\test%']
+    );
+  });
+
+  test('returns 500 when the summary query fails', async () => {
+    const app = loadApp();
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockRejectedValueOnce(new Error('boom'));
+
+    await request(app)
+      .get('/todos/summary')
+      .set(authForUser('u1'))
+      .expect(500, { error: 'Internal server error' });
   });
 });
 
