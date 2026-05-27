@@ -191,6 +191,7 @@ describe('browser auth helpers', () => {
     const tokenResponse = {
       access_token: 'access-token',
       id_token: 'id-token',
+      refresh_token: 'refresh-token',
       token_type: 'Bearer',
       expires_in: 3600,
     };
@@ -226,9 +227,12 @@ describe('browser auth helpers', () => {
     expect(body.get('code_verifier')).toBe('verifier');
 
     const stored = readStoredAuth();
-    expect(stored.access_token).toBe('access-token');
-    expect(stored.id_token).toBe('id-token');
-    expect(stored.expires_at).toBe(Date.parse('2024-01-01T01:00:00.000Z'));
+    expect(stored).toEqual({
+      access_token: 'access-token',
+      expires_at: Date.parse('2024-01-01T01:00:00.000Z'),
+    });
+    expect(stored.id_token).toBeUndefined();
+    expect(stored.refresh_token).toBeUndefined();
     expect(global.sessionStorage.getItem('todo-pkce-verifier')).toBeNull();
     expect(global.sessionStorage.getItem('todo-pkce-state')).toBeNull();
     expect(global.sessionStorage.getItem('todo-return-to')).toBeNull();
