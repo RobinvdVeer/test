@@ -125,28 +125,62 @@ function buildTodoSummarySelect() {
 }
 
 async function listTodosWithSummary(userId, { category, status, q, sort_by, limit, offset }) {
-  const { query: filteredQuery, params, paramCount } = buildTodosFilterQuery(userId, {
-    category,
-    status,
-    q,
-  });
+  let filteredQuery = 'SELECT * FROM todos WHERE user_id = $1';
+  const params = [userId];
+  let paramCount = 1;
 
-  const orderedPageQuery = applyListOrdering('SELECT * FROM filtered', sort_by);
-  const { query: pageQuery, params: pageParams } = applyPagination(
-    orderedPageQuery,
+  ({ query: filteredQuery, paramCount } = appendCategoryStatusFilters(
+    filteredQuery,
     params,
     paramCount,
-    { limit, offset }
-  );
+    { category, status }
+  ));
+  ({ query: filteredQuery, paramCount } = appendTextSearchFilter(
+    filteredQuery,
+    params,
+    paramCount,
+    q
+  ));
+  filteredQuery = applyListOrdering(filteredQuery, sort_by);
+
+  const requestedLimit = limit;
+  const requestedOffset = offset;
+  if (requestedLimit === undefined) {
+    if (requestedOffset === undefined) {
+      paramCount += 1;
+      filteredQuery += ` LIMIT $${paramCount}`;
+      params.push(50);
+      paramCount += 1;
+      filteredQuery += ` OFFSET $${paramCount}`;
+      params.push(0);
+    }
+  } else {
+    const safeLimit = Math.min(requestedLimit, 100);
+    paramCount += 1;
+    filteredQuery += ` LIMIT $${paramCount}`;
+    params.push(safeLimit);
+    paramCount += 1;
+    filteredQuery += ` OFFSET $${paramCount}`;
+    params.push(requestedOffset === undefined ? 0 : requestedOffset);
+  }
 
   const query = `WITH filtered AS (
   ${filteredQuery}
 ),
 page AS (
-  ${pageQuery}
+  SELECT * FROM filtered
 ),
 summary AS (
-  SELECT${buildTodoSummarySelect()}
+  SELECT
+  COUNT(*)::int AS total,
+  COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+  COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
+  COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+  COUNT(*) FILTER (WHERE priority = 'low')::int AS low,
+  COUNT(*) FILTER (WHERE priority = 'medium')::int AS medium,
+  COUNT(*) FILTER (WHERE priority = 'high')::int AS high,
+  MAX(created_at) AS latest_created_at,
+  MAX(updated_at) AS latest_updated_at
   FROM filtered
 )
 SELECT
@@ -154,20 +188,19 @@ SELECT
   row_to_json(summary) AS summary
 FROM summary`;
 
-  const result = await getPool().query(query, pageParams);
+  const result = await getPool().query(query, params);
   const row = result.rows[0] || {};
   const todos = Array.isArray(row.todos) ? row.todos : result.rows;
-
   const summary = row.summary || todos.reduce(
     (acc, todo) => {
-      const status = todo?.status;
-      const priority = todo?.priority;
-      if (status === 'pending') acc.pending += 1;
-      if (status === 'in_progress') acc.in_progress += 1;
-      if (status === 'completed') acc.completed += 1;
-      if (priority === 'low') acc.low += 1;
-      if (priority === 'medium') acc.medium += 1;
-      if (priority === 'high') acc.high += 1;
+      const todoStatus = todo?.status;
+      const todoPriority = todo?.priority;
+      if (todoStatus === 'pending') acc.pending += 1;
+      if (todoStatus === 'in_progress') acc.in_progress += 1;
+      if (todoStatus === 'completed') acc.completed += 1;
+      if (todoPriority === 'low') acc.low += 1;
+      if (todoPriority === 'medium') acc.medium += 1;
+      if (todoPriority === 'high') acc.high += 1;
       return acc;
     },
     {

@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   listTodosWithSummary,
+  getTodoSummary,
   createTodo,
   getTodoAndUpdateLastViewed,
   updateTodo,
@@ -58,7 +59,8 @@ function registerTodosRoutes() {
         offset: parseOptionalNonNegativeInt(offset),
       });
 
-      res.set('X-Todo-Summary', JSON.stringify(result.summary));
+      const summary = result.summary || (await getTodoSummary(req.userId, { category, status, q }));
+      res.set('X-Todo-Summary', JSON.stringify(summary));
       res.json(result.todos);
     })
   );
