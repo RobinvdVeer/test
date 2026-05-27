@@ -70,7 +70,11 @@ spec:
             - name: DAILY_REMINDER_EMAIL_FROM
               value: {{ .Values.app.reminders.from | quote }}
             - name: DAILY_REMINDER_EMAIL_API_KEY
-              value: {{ .Values.app.reminders.apiKey | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.reminders.secretName | quote }}
+                  key: {{ .Values.app.reminders.secretKey | quote }}
+                  optional: true
             - name: DAILY_REMINDER_RUN_AT
               value: {{ .Values.app.reminders.runAtUtc | quote }}
             - name: DAILY_REMINDER_LOOKAHEAD_DAYS

@@ -53,6 +53,34 @@ describe('daily reminders job', () => {
     expect(JSON.parse(firstRequest.body).text).toContain('http://app.example');
   });
 
+  test('sends separate reminders for separate users even if they share an email address', async () => {
+    const rows = [
+      { email: 'shared@example.com', user_id: 'alice', id: 1, title: 'Alice task', due_date: '2024-01-01' },
+      { email: 'shared@example.com', user_id: 'bob', id: 2, title: 'Bob task', due_date: '2024-01-01' },
+    ];
+    const pool = makePool(rows);
+    const fetchImpl = jest.fn(async () => ({ ok: true }));
+
+    const result = await runDailyReminderBatch({
+      pool,
+      config: {
+        enabled: true,
+        sendUrl: 'https://mailer.example/send',
+        from: 'todo-app@example.com',
+        runAtUtc: '08:00',
+        lookaheadDays: 0,
+        appBaseUrl: 'http://app.example',
+      },
+      fetchImpl,
+      now: () => new Date('2024-01-01T00:00:00.000Z'),
+    });
+
+    expect(result.recipients).toBe(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).text).toContain('Alice task');
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body).text).toContain('Bob task');
+  });
+
   test('does nothing when disabled', async () => {
     const pool = makePool([]);
     const fetchImpl = jest.fn();
