@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS todos (
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 CREATE INDEX IF NOT EXISTS idx_todos_user_id ON todos(user_id);
 CREATE INDEX IF NOT EXISTS idx_todos_user_status ON todos(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category ON todos(user_id, category);
@@ -33,3 +35,6 @@ CREATE INDEX IF NOT EXISTS idx_todos_user_status_created_at ON todos(user_id, st
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_updated_at ON todos(user_id, status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_created_at ON todos(user_id, category, created_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_updated_at ON todos(user_id, category, updated_at);
+CREATE INDEX IF NOT EXISTS idx_todos_title_trgm ON todos USING GIN (title gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_todos_description_trgm ON todos USING GIN ((COALESCE(description, '')) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_todos_category_trgm ON todos USING GIN (category gin_trgm_ops);

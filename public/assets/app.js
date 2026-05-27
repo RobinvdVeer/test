@@ -132,13 +132,23 @@ async function loadDashboard() {
   const filters = readFilters();
   syncUrl(filters);
 
-  const [todos, todoSummary] = await Promise.all([
-    fetchJson(buildUrl('/todos', filtersToSearchParams(filters))),
-    fetchJson(buildUrl('/todos/summary', filtersToSearchParams(filters, { includeSortAndLimit: false }))),
-  ]);
+  const response = await fetch(buildUrl('/todos', filtersToSearchParams(filters)), {
+    headers: getAuthHeaders(),
+  });
 
+  if (response.status === 401) {
+    clearStoredAuth();
+    window.location.replace(`/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+    throw new Error('Authentication required');
+  }
+
+  if (!response.ok) {
+    throw new Error(`Request failed (${response.status})`);
+  }
+
+  const todoSummary = JSON.parse(response.headers.get('X-Todo-Summary') || '{}');
   renderSummary(todoSummary);
-  renderTodos(todos);
+  renderTodos(await response.json());
 }
 
 async function createTodo(event) {

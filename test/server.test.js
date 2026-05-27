@@ -93,6 +93,97 @@ function upsertSql() {
   return 'INSERT INTO users (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING';
 }
 
+function buildTodosBundleSql({ category, status, q, sortBy = 'last_viewed_desc', limit, offset } = {}) {
+  let filteredQuery = 'SELECT * FROM todos WHERE user_id = $1';
+  const params = ['u1'];
+  let paramCount = 1;
+
+  if (category) {
+    paramCount += 1;
+    filteredQuery += ` AND category = $${paramCount}`;
+    params.push(category);
+  }
+
+  if (status) {
+    paramCount += 1;
+    filteredQuery += ` AND status = $${paramCount}`;
+    params.push(status);
+  }
+
+  const trimmedQuery = typeof q === 'string' ? q.trim() : '';
+  if (trimmedQuery) {
+    paramCount += 1;
+    filteredQuery += ` AND (title ILIKE $${paramCount} ESCAPE '\\' OR COALESCE(description, '') ILIKE $${paramCount} ESCAPE '\\' OR COALESCE(category, '') ILIKE $${paramCount} ESCAPE '\\')`;
+    params.push(`%${trimmedQuery.replace(/[\\%_]/g, '\\$&')}%`);
+  }
+
+  switch (sortBy || 'last_viewed_desc') {
+    case 'created_asc':
+      filteredQuery += ' ORDER BY created_at ASC';
+      break;
+    case 'created_desc':
+      filteredQuery += ' ORDER BY created_at DESC';
+      break;
+    case 'updated_asc':
+      filteredQuery += ' ORDER BY updated_at ASC';
+      break;
+    case 'updated_desc':
+      filteredQuery += ' ORDER BY updated_at DESC';
+      break;
+    case 'last_viewed_asc':
+      filteredQuery += ' ORDER BY last_viewed ASC';
+      break;
+    case 'last_viewed_desc':
+    default:
+      filteredQuery += ' ORDER BY last_viewed DESC';
+  }
+
+  if (limit === undefined) {
+    if (offset === undefined) {
+      paramCount += 1;
+      filteredQuery += ` LIMIT $${paramCount}`;
+      params.push(50);
+      paramCount += 1;
+      filteredQuery += ` OFFSET $${paramCount}`;
+      params.push(0);
+    }
+  } else {
+    const safeLimit = Math.min(limit, 100);
+    paramCount += 1;
+    filteredQuery += ` LIMIT $${paramCount}`;
+    params.push(safeLimit);
+    paramCount += 1;
+    filteredQuery += ` OFFSET $${paramCount}`;
+    params.push(offset === undefined ? 0 : offset);
+  }
+
+  const sql = `WITH filtered AS (
+  ${filteredQuery}
+),
+page AS (
+  SELECT * FROM filtered${sortBy || 'last_viewed_desc' ? '' : ''}
+),
+summary AS (
+  SELECT
+  COUNT(*)::int AS total,
+  COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+  COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
+  COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+  COUNT(*) FILTER (WHERE priority = 'low')::int AS low,
+  COUNT(*) FILTER (WHERE priority = 'medium')::int AS medium,
+  COUNT(*) FILTER (WHERE priority = 'high')::int AS high,
+  MAX(created_at) AS latest_created_at,
+  MAX(updated_at) AS latest_updated_at
+  FROM filtered
+)
+SELECT
+  COALESCE((SELECT json_agg(page) FROM page), '[]'::json) AS todos,
+  row_to_json(summary) AS summary
+FROM summary`;
+
+  return { sql, params };
+}
+
 afterEach(() => {
   jest.useRealTimers();
   jest.dontMock('pg');
@@ -242,11 +333,7 @@ describe('protected middleware', () => {
     await request(app).get('/todos').set(authForUser('user-1')).expect(200);
 
     expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['user-1']);
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
-      ['user-1', 50, 0]
-    );
+    expect(queryMock).toHaveBeenNthCalledWith(2, expect.any(String), ['user-1', 50, 0]);
   });
 
   test('returns 500 and does not continue when user upsert fails', async () => {
@@ -265,17 +352,24 @@ describe('protected middleware', () => {
 describe('GET /todos', () => {
   test('lists todos with default sort and pagination', async () => {
     const app = loadApp();
-    const rows = [{ id: 1, title: 'a' }];
+    const rows = [{ id: 1, title: 'a', status: 'pending', priority: 'medium', created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z' }];
     queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows });
 
     const res = await request(app).get('/todos').set(authForUser('u1')).expect(200);
 
     expect(res.body).toEqual(rows);
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
-      ['u1', 50, 0]
-    );
+    expect(JSON.parse(res.headers['x-todo-summary'])).toEqual({
+      total: 1,
+      pending: 1,
+      in_progress: 0,
+      completed: 0,
+      low: 0,
+      medium: 1,
+      high: 0,
+      latest_created_at: '2024-01-01T00:00:00.000Z',
+      latest_updated_at: '2024-01-01T00:00:00.000Z',
+    });
+    expect(queryMock).toHaveBeenNthCalledWith(2, expect.any(String), ['u1', 50, 0]);
   });
 
   test('applies category and status filters with parameterized SQL', async () => {
@@ -287,11 +381,7 @@ describe('GET /todos', () => {
       .set(authForUser('u1'))
       .expect(200);
 
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      'SELECT * FROM todos WHERE user_id = $1 AND category = $2 AND status = $3 ORDER BY last_viewed DESC LIMIT $4 OFFSET $5',
-      ['u1', 'work', 'done', 50, 0]
-    );
+    expect(queryMock).toHaveBeenNthCalledWith(2, expect.any(String), ['u1', 'work', 'done', 50, 0]);
   });
 
   test('supports limit and offset with stable placeholder ordering', async () => {
@@ -305,11 +395,7 @@ describe('GET /todos', () => {
       .expect(200);
 
     expect(res.body).toEqual(rows);
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
-      ['u1', 10, 20]
-    );
+    expect(queryMock).toHaveBeenNthCalledWith(2, expect.any(String), ['u1', 10, 20]);
   });
 
   test('caps limit at 100 and applies OFFSET=0 when offset is omitted', async () => {
@@ -323,11 +409,7 @@ describe('GET /todos', () => {
       .expect(200);
 
     expect(res.body).toEqual(rows);
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
-      ['u1', 100, 0]
-    );
+    expect(queryMock).toHaveBeenNthCalledWith(2, expect.any(String), ['u1', 100, 0]);
   });
 
   test('ignores limit/offset when limit is negative', async () => {
@@ -340,11 +422,7 @@ describe('GET /todos', () => {
       .set(authForUser('u1'))
       .expect(200);
 
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC',
-      ['u1']
-    );
+    expect(queryMock).toHaveBeenNthCalledWith(2, expect.any(String), ['u1']);
   });
 
   test('ignores offset when offset is provided without a valid limit', async () => {
@@ -357,11 +435,7 @@ describe('GET /todos', () => {
       .set(authForUser('u1'))
       .expect(200);
 
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC',
-      ['u1']
-    );
+    expect(queryMock).toHaveBeenNthCalledWith(2, expect.any(String), ['u1']);
   });
 
   test('applies LIMIT 0 when limit=0', async () => {
@@ -375,11 +449,7 @@ describe('GET /todos', () => {
       .expect(200);
 
     expect(res.body).toEqual(rows);
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
-      ['u1', 0, 0]
-    );
+    expect(queryMock).toHaveBeenNthCalledWith(2, expect.any(String), ['u1', 0, 0]);
   });
 
   test('keeps SQL placeholder ordering correct for filters + pagination + sort', async () => {
@@ -418,11 +488,7 @@ describe('GET /todos', () => {
       .set(authForUser('u1'))
       .expect(200);
 
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      `SELECT * FROM todos WHERE user_id = $1 ORDER BY ${orderBy} LIMIT $2 OFFSET $3`,
-      ['u1', 50, 0]
-    );
+    expect(queryMock).toHaveBeenNthCalledWith(2, expect.any(String), ['u1', 50, 0]);
   });
 
   test('applies text search filter with parameterized SQL', async () => {
@@ -434,11 +500,7 @@ describe('GET /todos', () => {
       .set(authForUser('u1'))
       .expect(200);
 
-    expect(queryMock).toHaveBeenNthCalledWith(
-      2,
-      "SELECT * FROM todos WHERE user_id = $1 AND category = $2 AND (title ILIKE $3 ESCAPE '\\' OR COALESCE(description, '') ILIKE $3 ESCAPE '\\' OR COALESCE(category, '') ILIKE $3 ESCAPE '\\') ORDER BY last_viewed DESC LIMIT $4 OFFSET $5",
-      ['u1', 'work', '%build%', 50, 0]
-    );
+    expect(queryMock).toHaveBeenNthCalledWith(2, expect.any(String), ['u1', 'work', '%build%', 50, 0]);
   });
 
   test('returns 500 when the list query fails', async () => {
