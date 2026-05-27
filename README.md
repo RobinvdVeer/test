@@ -56,8 +56,12 @@ See `.env.example` for the full local Docker Compose configuration.
 - `KEYCLOAK_ISSUER_URL`
 - `KEYCLOAK_JWKS_URL`
 - `KEYCLOAK_CLIENT_ID`
+- `KEYCLOAK_AUTHORIZE_URL` (optional override; defaults to `${KEYCLOAK_ISSUER_URL}/protocol/openid-connect/auth`)
+- `KEYCLOAK_TOKEN_URL` (optional override; defaults to `${KEYCLOAK_ISSUER_URL}/protocol/openid-connect/token`)
+- `KEYCLOAK_LOGOUT_URL` (optional override; defaults to `${KEYCLOAK_ISSUER_URL}/protocol/openid-connect/logout`)
 - `AUTH_REDIRECT_URI`
 - `AUTH_POST_LOGOUT_REDIRECT_URI`
+- `AUTH_SCOPE` (optional; defaults to `openid profile email`)
 
 ## Notes
 - Todo ownership is derived from the JWT `sub` claim.
