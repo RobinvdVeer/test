@@ -1,6 +1,6 @@
 import { clearStoredAuth, getStoredAuth, isTokenValid, logout } from './auth.js';
-import { hydrateFiltersFromUrl, readFilters, setFilters, syncUrl } from './todo-filters.js';
-import { createTodo as submitTodo, loadTodoSummary, loadTodos } from './todo-api.js';
+import { buildUrl, filtersToSearchParams, hydrateFiltersFromUrl, readFilters, setFilters, syncUrl } from './todo-filters.js';
+import { createTodo as submitTodo } from './todo-api.js';
 import { renderSummary, renderTodos } from './todo-rendering.js';
 
 const status = document.getElementById('status');
@@ -21,17 +21,36 @@ function requireAuth() {
   return auth;
 }
 
+function getAuthHeaders() {
+  const auth = getStoredAuth();
+  return { Authorization: `Bearer ${auth.access_token}` };
+}
+
+function handleUnauthorized() {
+  clearStoredAuth();
+  window.location.replace(`/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+  throw new Error('Authentication required');
+}
+
 async function loadDashboard() {
   const filters = readFilters(filtersForm);
   syncUrl(filters);
 
-  const [todos, todoSummary] = await Promise.all([
-    loadTodos(filters),
-    loadTodoSummary(filters),
-  ]);
+  const response = await fetch(buildUrl('/todos', filtersToSearchParams(filters)), {
+    headers: getAuthHeaders(),
+  });
 
+  if (response.status === 401) {
+    handleUnauthorized();
+  }
+
+  if (!response.ok) {
+    throw new Error(`Request failed (${response.status})`);
+  }
+
+  const todoSummary = JSON.parse(response.headers.get('X-Todo-Summary') || '{}');
   renderSummary(summary, todoSummary);
-  renderTodos(todosList, todos);
+  renderTodos(todosList, await response.json());
 }
 
 async function createTodo(event) {

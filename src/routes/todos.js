@@ -1,6 +1,6 @@
 const express = require('express');
 const {
-  listTodos,
+  listTodosWithSummary,
   createTodo,
   getTodoAndUpdateLastViewed,
   updateTodo,
@@ -49,7 +49,7 @@ function registerTodosRoutes() {
     withErrorHandling('Error fetching todos:', async (req, res) => {
       const { category, status, q, sort_by, limit, offset } = req.query;
 
-      const result = await listTodos(req.userId, {
+      const result = await listTodosWithSummary(req.userId, {
         category,
         status,
         q,
@@ -58,7 +58,8 @@ function registerTodosRoutes() {
         offset: parseOptionalNonNegativeInt(offset),
       });
 
-      res.json(result);
+      res.set('X-Todo-Summary', JSON.stringify(result.summary));
+      res.json(result.todos);
     })
   );
 
