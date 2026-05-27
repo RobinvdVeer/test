@@ -11,6 +11,7 @@ const {
   VALID_STATUS,
   normalizeSortBy,
   parseOptionalNonNegativeInt,
+  validateDueDate,
 } = require('../todos/rules');
 
 function withErrorHandling(logPrefix, handler) {
@@ -38,15 +39,6 @@ function validateEnumOr400(value, validSet, fieldName, res) {
 
 function isValidNumericId(id) {
   return typeof id === 'string' && /^\d+$/.test(id);
-}
-
-function isValidDateOnly(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function registerTodosRoutes() {
@@ -82,8 +74,13 @@ function registerTodosRoutes() {
 
       if (!validateEnumOr400(status, VALID_STATUS, 'status', res)) return;
       if (!validateEnumOr400(priority, VALID_PRIORITY, 'priority', res)) return;
-      if (due_date !== undefined && due_date !== null && due_date !== '' && !isValidDateOnly(due_date)) {
-        return res.status(400).json({ error: 'Invalid due_date' });
+      try {
+        validateDueDate(due_date);
+      } catch (error) {
+        if (error.code === 'INVALID_DUE_DATE') {
+          return res.status(400).json({ error: 'Invalid due_date' });
+        }
+        throw error;
       }
 
       const result = await createTodo(req.userId, {
@@ -131,8 +128,13 @@ function registerTodosRoutes() {
 
       if (!validateEnumOr400(status, VALID_STATUS, 'status', res)) return;
       if (!validateEnumOr400(priority, VALID_PRIORITY, 'priority', res)) return;
-      if (due_date !== undefined && due_date !== null && due_date !== '' && !isValidDateOnly(due_date)) {
-        return res.status(400).json({ error: 'Invalid due_date' });
+      try {
+        validateDueDate(due_date);
+      } catch (error) {
+        if (error.code === 'INVALID_DUE_DATE') {
+          return res.status(400).json({ error: 'Invalid due_date' });
+        }
+        throw error;
       }
 
       const result = await updateTodo(req.userId, id, {
