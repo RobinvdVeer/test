@@ -82,6 +82,19 @@
           "latest_updated_at": { "type": "string", "format": "date-time", "nullable": true }
         }
       },
+      "AuthConfig": {
+        "type": "object",
+        "properties": {
+          "issuerUrl": { "type": "string", "format": "uri" },
+          "clientId": { "type": "string" },
+          "authorizeUrl": { "type": "string", "format": "uri" },
+          "tokenUrl": { "type": "string", "format": "uri" },
+          "logoutUrl": { "type": "string", "format": "uri" },
+          "redirectUri": { "type": "string", "format": "uri" },
+          "postLogoutRedirectUri": { "type": "string", "format": "uri" },
+          "scope": { "type": "string" }
+        }
+      },
       "Error": {
         "type": "object",
         "properties": {
@@ -155,7 +168,17 @@
             "description": "OIDC client configuration",
             "content": {
               "application/json": {
-                "schema": { "type": "object" }
+                "schema": { "$ref": "#/components/schemas/AuthConfig" },
+                "example": {
+                  "issuerUrl": "http://localhost:8081/realms/todos",
+                  "clientId": "todo-app",
+                  "authorizeUrl": "http://localhost:8081/realms/todos/protocol/openid-connect/auth",
+                  "tokenUrl": "http://localhost:8081/realms/todos/protocol/openid-connect/token",
+                  "logoutUrl": "http://localhost:8081/realms/todos/protocol/openid-connect/logout",
+                  "redirectUri": "http://localhost:3000/auth/callback",
+                  "postLogoutRedirectUri": "http://localhost:3000/login",
+                  "scope": "openid profile email"
+                }
               }
             }
           }
@@ -261,7 +284,7 @@
           {
             "name": "limit",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+            "schema": { "type": "integer", "minimum": 0, "maximum": 100, "default": 50 }
           },
           {
             "name": "offset",

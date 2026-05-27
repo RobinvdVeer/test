@@ -48,11 +48,12 @@ function registerTodosRoutes() {
   router.get(
     '/',
     withErrorHandling('Error fetching todos:', async (req, res) => {
-      const { category, status, sort_by, limit, offset } = req.query;
+      const { category, status, q, sort_by, limit, offset } = req.query;
 
       const result = await listTodos(req.userId, {
         category,
         status,
+        q,
         sort_by: normalizeSortBy(sort_by),
         limit: parseOptionalNonNegativeInt(limit),
         offset: parseOptionalNonNegativeInt(offset),
