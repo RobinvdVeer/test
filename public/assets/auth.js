@@ -16,8 +16,21 @@ export function getStoredAuth() {
   return raw ? JSON.parse(raw) : null;
 }
 
+function sanitizeStoredAuth(auth) {
+  if (!auth?.access_token || !auth?.expires_at) return null;
+  return {
+    access_token: auth.access_token,
+    expires_at: auth.expires_at,
+  };
+}
+
 export function setStoredAuth(auth) {
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
+  const sanitized = sanitizeStoredAuth(auth);
+  if (!sanitized) {
+    sessionStorage.removeItem(STORAGE_KEY);
+    return;
+  }
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
 }
 
 export function clearStoredAuth() {
