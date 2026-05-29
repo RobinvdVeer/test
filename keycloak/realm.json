@@ -20,11 +20,15 @@
   "users": [
     {
       "username": "alice",
-      "enabled": true
+      "enabled": true,
+      "email": "alice@example.com",
+      "emailVerified": true
     },
     {
       "username": "bob",
-      "enabled": true
+      "enabled": true,
+      "email": "bob@example.com",
+      "emailVerified": true
     }
   ]
 }

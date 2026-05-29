@@ -49,6 +49,9 @@ test('openapi.json is a valid OpenAPI 3 document for implemented routes', async 
     '/todos',
     '/todos/{id}'
   ]));
+  expect(openApiDocument.components.schemas.Todo.properties.due_at).toBeDefined();
+  expect(openApiDocument.components.schemas.Todo.properties.reminder_sent_at).toBeDefined();
+  expect(openApiDocument.components.schemas.TodoInput.properties.due_at).toBeDefined();
 });
 
 test('served /openapi.json matches committed openapi.json', async () => {

@@ -81,6 +81,15 @@ services:
       AUTH_REDIRECT_URI: ${AUTH_REDIRECT_URI:-http://localhost:3000/auth/callback}
       AUTH_POST_LOGOUT_REDIRECT_URI: ${AUTH_POST_LOGOUT_REDIRECT_URI:-http://localhost:3000/login}
       AUTH_SCOPE: ${AUTH_SCOPE:-openid profile email}
+      EMAIL_REMINDERS_ENABLED: ${EMAIL_REMINDERS_ENABLED:-false}
+      EMAIL_REMINDERS_DUE_SOON_HOURS: ${EMAIL_REMINDERS_DUE_SOON_HOURS:-24}
+      EMAIL_REMINDERS_INTERVAL_MS: ${EMAIL_REMINDERS_INTERVAL_MS:-3600000}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-25}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@localhost}
     depends_on:
       postgres:
         condition: service_healthy

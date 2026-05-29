@@ -15,6 +15,7 @@ The staging values use External Secrets Operator. Before deploying, make sure th
 
 - `metrics-server/staging/database` property `database-url`
 - `metrics-server/staging/postgres` property `postgres-password`
+- `metrics-server/staging/email` property `smtp-password` (only when reminder emails are enabled)
 
 ```sh
 helm upgrade --install metrics-server ./deploy/chart \
@@ -28,6 +29,8 @@ For local/non-ESO environments, disable `externalSecrets.enabled` and either:
 
 - use pre-created Kubernetes/Sealed Secrets named by `app.database.secretName` and `postgres.auth.passwordSecretName`, or
 - inject temporary chart-created secrets at deploy time with `secrets.create=true` and `--set-string` values.
+
+Reminder emails are disabled by default. If you enable them, also provide `SMTP_*` values and the SMTP password secret.
 
 Do not commit real secret values.
 

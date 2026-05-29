@@ -98,14 +98,30 @@ function validateStatusPriority({ status, priority }) {
   }
 }
 
-async function createTodo(userId, { title, description, category, status, priority }) {
+async function createTodo(userId, { title, description, category, status, priority, dueAt }) {
   const statusToUse = status || DEFAULT_TODO_STATUS;
   const priorityToUse = priority || DEFAULT_TODO_PRIORITY;
 
   validateStatusPriority({ status: statusToUse, priority: priorityToUse });
 
+  if (dueAt === undefined) {
+    const result = await getPool().query(
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+      [
+        userId,
+        title,
+        description || null,
+        category || null,
+        statusToUse,
+        priorityToUse,
+      ]
+    );
+
+    return result.rows[0];
+  }
+
   const result = await getPool().query(
-    'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+    'INSERT INTO todos (user_id, title, description, category, status, priority, due_at, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *',
     [
       userId,
       title,
@@ -113,6 +129,7 @@ async function createTodo(userId, { title, description, category, status, priori
       category || null,
       statusToUse,
       priorityToUse,
+      dueAt,
     ]
   );
 
@@ -142,13 +159,14 @@ WHERE id = $1 AND user_id = $2
   return result.rows[0] || null;
 }
 
-async function updateTodo(userId, id, { title, description, category, status, priority }) {
+async function updateTodo(userId, id, { title, description, category, status, priority, dueAt }) {
   validateStatusPriority({ status, priority });
 
   // Update only provided fields
   const updateFields = [];
   const updateValues = [];
   let paramCount = 1;
+  let resetReminderSentAt = false;
 
   if (title !== undefined) {
     updateFields.push(`title = $${paramCount++}`);
@@ -165,15 +183,25 @@ async function updateTodo(userId, id, { title, description, category, status, pr
   if (status !== undefined) {
     updateFields.push(`status = $${paramCount++}`);
     updateValues.push(status);
+    resetReminderSentAt = true;
   }
   if (priority !== undefined) {
     updateFields.push(`priority = $${paramCount++}`);
     updateValues.push(priority);
   }
+  if (dueAt !== undefined) {
+    updateFields.push(`due_at = $${paramCount++}`);
+    updateValues.push(dueAt);
+    resetReminderSentAt = true;
+  }
 
   if (updateFields.length === 0) {
     // Let route translate this to 400
     return { type: 'NO_FIELDS_TO_UPDATE' };
+  }
+
+  if (resetReminderSentAt) {
+    updateFields.push('reminder_sent_at = NULL');
   }
 
   updateFields.push('updated_at = NOW()');

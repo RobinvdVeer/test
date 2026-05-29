@@ -1,22 +1,29 @@
 const { createApp } = require('./src/app');
 const { getConfig } = require('./src/config');
+const { migrateDatabase } = require('./src/db/migrate');
 const { getPool, closePool } = require('./src/db/pool');
+const { createTodoReminderService } = require('./src/email/reminderService');
 
 const { PORT } = getConfig();
 
 let pool;
+let server;
+let reminderStop;
 
 const app = createApp();
 
-let server;
-
-if (require.main === module) {
+async function main() {
   if (!process.env.DATABASE_URL) {
     console.error('DATABASE_URL environment variable is required');
     process.exit(1);
   }
 
   pool = getPool();
+  await migrateDatabase(pool);
+
+  const config = getConfig();
+  const reminderService = createTodoReminderService({ pool, config: config.emailReminders });
+  reminderStop = reminderService.start();
 
   server = app.listen(PORT, () => {
     console.log(`Todo app running on http://localhost:${PORT}`);
@@ -27,6 +34,7 @@ if (require.main === module) {
 
   process.on('SIGTERM', () => {
     console.log('SIGTERM signal received: closing HTTP server');
+    if (reminderStop) reminderStop();
     if (!server) return;
 
     server.close(() => {
@@ -44,4 +52,11 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, pool };
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
+}
+
+module.exports = { app, pool, main };

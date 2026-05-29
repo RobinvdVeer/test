@@ -60,7 +60,8 @@ describe('helm chart deployability conventions', () => {
       '--set-string', 'secrets.databaseUrl=postgresql://user:pass@test-postgres:5432/db',
       '--set-string', 'secrets.postgresPassword=pass',
       '--set-string', 'secrets.keycloakPostgresPassword=kc-pass',
-      '--set-string', 'secrets.keycloakAdminPassword=kc-admin'
+      '--set-string', 'secrets.keycloakAdminPassword=kc-admin',
+      '--set-string', 'secrets.smtpPassword=mail-pass'
     ], { encoding: 'utf8' });
 
     const docs = yaml.loadAll(rendered).filter(Boolean);
@@ -69,6 +70,7 @@ describe('helm chart deployability conventions', () => {
     const keycloakDeployment = docs.find((doc) => doc.kind === 'Deployment' && doc.metadata.name === 'test-keycloak');
     const keycloakService = docs.find((doc) => doc.kind === 'Service' && doc.metadata.name === 'test-keycloak');
     const keycloakSecret = docs.find((doc) => doc.kind === 'Secret' && doc.metadata.name === 'metrics-server-keycloak');
+    const emailSecret = docs.find((doc) => doc.kind === 'Secret' && doc.metadata.name === 'metrics-server-email');
     const keycloakRealm = docs.find((doc) => doc.kind === 'ConfigMap' && doc.metadata.name === 'test-keycloak-realm');
     const postgresInit = docs.find((doc) => doc.kind === 'ConfigMap' && doc.metadata.name === 'test-postgres-init');
 
@@ -89,6 +91,14 @@ describe('helm chart deployability conventions', () => {
       expect.objectContaining({ name: 'AUTH_REDIRECT_URI', value: 'http://localhost:3000/auth/callback' }),
       expect.objectContaining({ name: 'AUTH_POST_LOGOUT_REDIRECT_URI', value: 'http://localhost:3000/login' }),
       expect.objectContaining({ name: 'KEYCLOAK_CLIENT_ID', value: 'todo-app' }),
+      expect.objectContaining({ name: 'EMAIL_REMINDERS_ENABLED', value: 'false' }),
+      expect.objectContaining({ name: 'EMAIL_REMINDERS_DUE_SOON_HOURS', value: '24' }),
+      expect.objectContaining({ name: 'EMAIL_REMINDERS_INTERVAL_MS', value: '3600000' }),
+      expect.objectContaining({ name: 'SMTP_HOST', value: 'localhost' }),
+      expect.objectContaining({ name: 'SMTP_PORT', value: '25' }),
+      expect.objectContaining({ name: 'SMTP_SECURE', value: 'false' }),
+      expect.objectContaining({ name: 'SMTP_USER', value: '' }),
+      expect.objectContaining({ name: 'SMTP_FROM', value: 'no-reply@localhost' }),
     ]));
 
     expect(keycloakPostgresDeployment.spec.template.spec.containers[0].env).toEqual(expect.arrayContaining([
@@ -116,10 +126,13 @@ describe('helm chart deployability conventions', () => {
     expect(keycloakService.spec.ports[0]).toMatchObject({ port: 8080, targetPort: 'http', name: 'http' });
     expect(keycloakSecret.stringData['postgres-password']).toBe('kc-pass');
     expect(keycloakSecret.stringData['admin-password']).toBe('kc-admin');
+    expect(emailSecret.stringData['smtp-password']).toBe('mail-pass');
     expect(keycloakRealm.data['realm.json']).toContain('"realm": "todos"');
     expect(keycloakRealm.data['realm.json']).toContain('"clientId": "todo-app"');
     expect(keycloakRealm.data['realm.json']).toContain('http://localhost:3000/auth/callback');
     expect(keycloakRealm.data['realm.json']).toContain('http://localhost:3000');
+    expect(keycloakRealm.data['realm.json']).toContain('"email": "alice@example.com"');
+    expect(keycloakRealm.data['realm.json']).toContain('"email": "bob@example.com"');
     expect(postgresInit.data['init.sql']).toContain('CREATE TABLE IF NOT EXISTS users');
     expect(postgresInit.data['init.sql']).toContain('CREATE TABLE IF NOT EXISTS todos');
     expect(postgresInit.data['init.sql']).toContain('CREATE INDEX IF NOT EXISTS idx_todos_user_id');

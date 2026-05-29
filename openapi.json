@@ -39,6 +39,8 @@
           },
           "created_at": { "type": "string", "format": "date-time" },
           "updated_at": { "type": "string", "format": "date-time" },
+          "due_at": { "type": "string", "format": "date-time", "nullable": true },
+          "reminder_sent_at": { "type": "string", "format": "date-time", "nullable": true },
           "last_viewed": { "type": "string", "format": "date-time" }
         }
       },
@@ -55,7 +57,8 @@
           "priority": {
             "type": "string",
             "enum": ["low", "medium", "high"]
-          }
+          },
+          "due_at": { "type": "string", "format": "date-time", "nullable": true }
         }
       },
       "Error": {

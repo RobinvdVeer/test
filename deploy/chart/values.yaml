@@ -52,6 +52,20 @@ secrets:
   postgresPassword: ""
   keycloakPostgresPassword: ""
   keycloakAdminPassword: ""
+  smtpPassword: ""
+
+emailReminders:
+  enabled: false
+  dueSoonHours: 24
+  intervalMs: 3600000
+  smtp:
+    host: localhost
+    port: 25
+    secure: false
+    user: ""
+    from: no-reply@localhost
+    passwordSecretName: metrics-server-email
+    passwordSecretKey: smtp-password
 
 externalSecrets:
   enabled: false
@@ -76,6 +90,10 @@ externalSecrets:
     remoteRef:
       key: metrics-server/keycloak
       property: admin-password
+  emailSmtpPassword:
+    remoteRef:
+      key: metrics-server/email
+      property: smtp-password
 
 postgres:
   enabled: true

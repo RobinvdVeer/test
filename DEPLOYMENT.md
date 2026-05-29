@@ -63,7 +63,7 @@ docker-compose down
 **Setup:**
 - Build and push the app image as `ghcr.io/robinvdveer/metrics-server:<tag>`
 - Deploy with the Helm chart in `deploy/chart`
-- Supply todo database, Keycloak database, and Keycloak admin credentials as Kubernetes, External, or Sealed Secrets; do not commit real secret values
+- Supply todo database, Keycloak database, Keycloak admin credentials, and optional SMTP credentials as Kubernetes, External, or Sealed Secrets; do not commit real secret values
 - Use managed PostgreSQL for production, or the chart's PostgreSQL services for simple environments
 
 Primary Kubernetes deployment path:
@@ -75,6 +75,7 @@ export POSTGRES_PASSWORD='replace-me'
 export KEYCLOAK_POSTGRES_PASSWORD='replace-me'
 export KEYCLOAK_ADMIN_PASSWORD='replace-me'
 export DATABASE_URL="postgresql://todouser:${POSTGRES_PASSWORD}@metrics-server-postgres:5432/tododb"
+export EMAIL_REMINDERS_ENABLED=false
 helm upgrade --install metrics-server ./deploy/chart \
   -f ./deploy/values-staging.yaml \
   --set image.app.tag=<tag> \

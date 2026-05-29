@@ -63,6 +63,29 @@ spec:
               value: {{ .Values.app.auth.postLogoutRedirectUri | quote }}
             - name: AUTH_SCOPE
               value: {{ .Values.app.auth.scope | quote }}
+            - name: EMAIL_REMINDERS_ENABLED
+              value: {{ .Values.emailReminders.enabled | quote }}
+            - name: EMAIL_REMINDERS_DUE_SOON_HOURS
+              value: {{ .Values.emailReminders.dueSoonHours | quote }}
+            - name: EMAIL_REMINDERS_INTERVAL_MS
+              value: {{ .Values.emailReminders.intervalMs | quote }}
+            - name: SMTP_HOST
+              value: {{ .Values.emailReminders.smtp.host | quote }}
+            - name: SMTP_PORT
+              value: {{ .Values.emailReminders.smtp.port | quote }}
+            - name: SMTP_SECURE
+              value: {{ .Values.emailReminders.smtp.secure | quote }}
+            - name: SMTP_USER
+              value: {{ .Values.emailReminders.smtp.user | quote }}
+            - name: SMTP_FROM
+              value: {{ .Values.emailReminders.smtp.from | quote }}
+            {{- if .Values.emailReminders.enabled }}
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.emailReminders.smtp.passwordSecretName }}
+                  key: {{ .Values.emailReminders.smtp.passwordSecretKey }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /health

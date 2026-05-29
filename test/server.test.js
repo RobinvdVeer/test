@@ -67,13 +67,14 @@ function loadApp(now = '2024-01-01T00:00:00.000Z') {
   return require('../server').app;
 }
 
-function tokenForUser(userId) {
+function tokenForUser(userId, email = `${userId}@example.com`) {
   const header = base64UrlEncode(JSON.stringify({ alg: 'RS256', kid: 'test-key', typ: 'JWT' }));
   const now = Math.floor(Date.now() / 1000);
   const payload = base64UrlEncode(
     JSON.stringify({
       iss: process.env.KEYCLOAK_ISSUER_URL,
       sub: userId,
+      email,
       aud: process.env.KEYCLOAK_CLIENT_ID,
       azp: process.env.KEYCLOAK_CLIENT_ID,
       iat: now,
@@ -85,12 +86,12 @@ function tokenForUser(userId) {
   return `${signingInput}.${base64UrlEncode(signature)}`;
 }
 
-function authForUser(userId) {
-  return { Authorization: `Bearer ${tokenForUser(userId)}` };
+function authForUser(userId, email = `${userId}@example.com`) {
+  return { Authorization: `Bearer ${tokenForUser(userId, email)}` };
 }
 
 function upsertSql() {
-  return 'INSERT INTO users (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING';
+  return 'INSERT INTO users (user_id, email) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET email = COALESCE(EXCLUDED.email, users.email)';
 }
 
 afterEach(() => {
@@ -241,7 +242,7 @@ describe('protected middleware', () => {
 
     await request(app).get('/todos').set(authForUser('user-1')).expect(200);
 
-    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['user-1']);
+    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['user-1', 'user-1@example.com']);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
       'SELECT * FROM todos WHERE user_id = $1 ORDER BY last_viewed DESC LIMIT $2 OFFSET $3',
@@ -471,6 +472,42 @@ describe('POST /todos', () => {
     );
   });
 
+  test('creates a todo with an explicit due date', async () => {
+    const app = loadApp();
+    const row = {
+      id: 1,
+      title: 'new',
+      status: 'pending',
+      priority: 'medium',
+      due_at: '2024-01-02T10:00:00.000Z',
+    };
+    queryMock.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .post('/todos')
+      .set(authForUser('u1'))
+      .send({ title: 'new', due_at: '2024-01-02T10:00:00.000Z' })
+      .expect(201);
+
+    expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'INSERT INTO todos (user_id, title, description, category, status, priority, due_at, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium', '2024-01-02T10:00:00.000Z']
+    );
+  });
+
+  test('rejects invalid due dates', async () => {
+    const app = loadApp();
+    queryMock.mockResolvedValueOnce({ rows: [] });
+
+    await request(app)
+      .post('/todos')
+      .set(authForUser('u1'))
+      .send({ title: 'new', due_at: 'not-a-date' })
+      .expect(400, { error: 'Invalid due_at' });
+  });
+
   test('uses default status when status is an empty string', async () => {
     const app = loadApp();
     const row = { id: 1, title: 'new', status: 'pending', priority: 'medium' };
@@ -638,6 +675,33 @@ describe('PUT /todos/:id', () => {
     );
   });
 
+  test('resets reminder state when due date changes', async () => {
+    const app = loadApp();
+    const row = {
+      id: 7,
+      title: 'updated',
+      due_at: '2024-01-03T10:00:00.000Z',
+      reminder_sent_at: null,
+    };
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [row] });
+
+    const res = await request(app)
+      .put('/todos/7')
+      .set(authForUser('u1'))
+      .send({ due_at: '2024-01-03T10:00:00.000Z' })
+      .expect(200);
+
+    expect(res.body).toEqual(row);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      'UPDATE todos SET due_at = $1, reminder_sent_at = NULL, updated_at = NOW(), last_viewed = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
+      ['2024-01-03T10:00:00.000Z', '7', 'u1']
+    );
+  });
+
   test('returns 500 when update query fails', async () => {
     const app = loadApp();
     queryMock
@@ -667,7 +731,7 @@ describe('PUT /todos/:id', () => {
 
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenCalledTimes(2);
-    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['u1']);
+    expect(queryMock).toHaveBeenNthCalledWith(1, upsertSql(), ['u1', 'u1@example.com']);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
       'UPDATE todos SET title = $1, updated_at = NOW(), last_viewed = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',

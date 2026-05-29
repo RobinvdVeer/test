@@ -21,6 +21,13 @@ function requireAuth() {
   return auth;
 }
 
+function formatDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString();
+}
+
 function renderTodos(todos) {
   todosList.innerHTML = '';
   if (!todos.length) {
@@ -32,7 +39,7 @@ function renderTodos(todos) {
     const li = document.createElement('li');
     li.innerHTML = `
       <div class="todo-title">${escapeHtml(todo.title)}</div>
-      <div class="todo-meta">${escapeHtml(todo.status)} · ${escapeHtml(todo.priority)}${todo.category ? ` · ${escapeHtml(todo.category)}` : ''}</div>
+      <div class="todo-meta">${escapeHtml(todo.status)} · ${escapeHtml(todo.priority)}${todo.category ? ` · ${escapeHtml(todo.category)}` : ''}${todo.due_at ? ` · due ${escapeHtml(formatDateTime(todo.due_at))}` : ''}</div>
       <div>${escapeHtml(todo.description || '')}</div>
     `;
     todosList.appendChild(li);
@@ -52,12 +59,14 @@ async function loadTodos() {
 
 async function createTodo(event) {
   event.preventDefault();
+  const dueAtInput = document.getElementById('due_at').value;
   const body = {
     title: document.getElementById('title').value,
     description: document.getElementById('description').value || undefined,
     category: document.getElementById('category').value || undefined,
     status: document.getElementById('status-input').value || undefined,
     priority: document.getElementById('priority').value || undefined,
+    due_at: dueAtInput ? new Date(dueAtInput).toISOString() : undefined,
   };
 
   const response = await fetch('/todos', {

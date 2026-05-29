@@ -24,6 +24,13 @@ function normalizeSortBy(sortBy) {
   return VALID_SORT_BY.has(sortBy) ? sortBy : undefined;
 }
 
+function parseOptionalDateTime(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
 module.exports = {
   DEFAULT_TODO_PRIORITY,
   DEFAULT_TODO_STATUS,
@@ -31,5 +38,6 @@ module.exports = {
   VALID_SORT_BY,
   VALID_STATUS,
   normalizeSortBy,
+  parseOptionalDateTime,
   parseOptionalNonNegativeInt,
 };

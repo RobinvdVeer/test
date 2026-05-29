@@ -1,7 +1,7 @@
 # Metrics Todo API Documentation
 
 ## Overview
-This is a multi-user todo and metrics API built with Express.js and PostgreSQL. Todo requests are authenticated with Keycloak JWT bearer tokens and user ownership is derived from the token `sub` claim.
+This is a multi-user todo and metrics API built with Express.js and PostgreSQL. Todo requests are authenticated with Keycloak JWT bearer tokens and user ownership is derived from the token `sub` claim. Optional reminder emails can be enabled with a feature flag for pending todos nearing their due date.
 
 ## Getting Started
 
@@ -102,7 +102,8 @@ Content-Type: application/json
   "description": "Milk, eggs, bread",
   "category": "personal",
   "status": "pending",
-  "priority": "medium"
+  "priority": "medium",
+  "due_at": "2024-01-20T17:00:00Z"
 }
 ```
 
@@ -111,6 +112,7 @@ Content-Type: application/json
 - `category` - Optional
 - `status` - Optional; one of `pending`, `in_progress`, `completed` (default: `pending`)
 - `priority` - Optional; one of `low`, `medium`, `high` (default: `medium`)
+- `due_at` - Optional due date/time in ISO 8601 format
 
 Response: `201 Created` with the created todo object.
 
@@ -130,6 +132,8 @@ Response:
   "category": "work",
   "status": "pending",
   "priority": "high",
+  "due_at": "2024-01-16T10:30:00Z",
+  "reminder_sent_at": null,
   "created_at": "2024-01-15T10:30:00Z",
   "updated_at": "2024-01-15T10:30:00Z",
   "last_viewed": "2024-01-15T14:25:00Z"
@@ -147,7 +151,7 @@ Content-Type: application/json
 }
 ```
 
-All fields are optional. Only provided fields are updated. If supplied, `status` must be one of `pending`, `in_progress`, `completed`, and `priority` must be one of `low`, `medium`, `high`. The `updated_at` and `last_viewed` timestamps are automatically updated.
+All fields are optional. Only provided fields are updated. If supplied, `status` must be one of `pending`, `in_progress`, `completed`; `priority` must be one of `low`, `medium`, `high`; and `due_at` must be an ISO 8601 date/time. The `updated_at`, `last_viewed`, and reminder state are automatically updated.
 
 Response: Updated todo object with status `200 OK`.
 
@@ -163,6 +167,7 @@ Response: `200 OK` with deleted todo details.
 ### Users Table
 - `id` - Auto-incremented primary key
 - `user_id` - Unique user identifier derived from the JWT `sub` claim
+- `email` - User email address from the JWT `email` claim (used for reminder emails)
 - `created_at` - Account creation timestamp
 
 ### Todos Table
@@ -173,6 +178,8 @@ Response: `200 OK` with deleted todo details.
 - `category` - Category/tag for organizing todos
 - `status` - Todo status (`pending`, `in_progress`, or `completed`)
 - `priority` - Priority level (`low`, `medium`, or `high`)
+- `due_at` - Optional due date/time used for reminders
+- `reminder_sent_at` - When the last reminder email was sent
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
 - `last_viewed` - Last time the todo was viewed or updated (used for "forgotten items" insights)

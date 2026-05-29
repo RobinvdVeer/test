@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   user_id VARCHAR(255) UNIQUE NOT NULL,
+  email VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -14,12 +15,15 @@ CREATE TABLE IF NOT EXISTS todos (
   category VARCHAR(100),
   status VARCHAR(50) DEFAULT 'pending',
   priority VARCHAR(50) DEFAULT 'medium',
+  due_at TIMESTAMP,
+  reminder_sent_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_viewed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_todos_user_id ON todos(user_id);
 CREATE INDEX IF NOT EXISTS idx_todos_user_status ON todos(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category ON todos(user_id, category);
@@ -33,3 +37,6 @@ CREATE INDEX IF NOT EXISTS idx_todos_user_status_created_at ON todos(user_id, st
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_updated_at ON todos(user_id, status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_created_at ON todos(user_id, category, created_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_updated_at ON todos(user_id, category, updated_at);
+CREATE INDEX IF NOT EXISTS idx_todos_user_due_at ON todos(user_id, due_at);
+CREATE INDEX IF NOT EXISTS idx_todos_user_reminder_sent_at ON todos(user_id, reminder_sent_at);
+CREATE INDEX IF NOT EXISTS idx_todos_user_pending_due_at ON todos(user_id, status, due_at) WHERE status = 'pending';

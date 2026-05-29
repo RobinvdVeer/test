@@ -10,6 +10,7 @@ const {
   VALID_PRIORITY,
   VALID_STATUS,
   normalizeSortBy,
+  parseOptionalDateTime,
   parseOptionalNonNegativeInt,
 } = require('../todos/rules');
 
@@ -65,7 +66,7 @@ function registerTodosRoutes() {
   router.post(
     '/',
     withErrorHandling('Error creating todo:', async (req, res) => {
-      const { title, description, category, status, priority } = req.body;
+      const { title, description, category, status, priority, due_at } = req.body;
 
       if (!title) {
         return res.status(400).json({ error: 'Title is required' });
@@ -74,12 +75,18 @@ function registerTodosRoutes() {
       if (!validateEnumOr400(status, VALID_STATUS, 'status', res)) return;
       if (!validateEnumOr400(priority, VALID_PRIORITY, 'priority', res)) return;
 
+      const dueAt = parseOptionalDateTime(due_at);
+      if (dueAt === null) {
+        return res.status(400).json({ error: 'Invalid due_at' });
+      }
+
       const result = await createTodo(req.userId, {
         title,
         description,
         category,
         status,
         priority,
+        dueAt,
       });
 
       res.status(201).json(result);
@@ -110,7 +117,7 @@ function registerTodosRoutes() {
     '/:id',
     withErrorHandling('Error updating todo:', async (req, res) => {
       const { id } = req.params;
-      const { title, description, category, status, priority } = req.body;
+      const { title, description, category, status, priority, due_at } = req.body;
 
       if (!isValidNumericId(id)) {
         return res.status(400).json({ error: 'Invalid id' });
@@ -119,12 +126,18 @@ function registerTodosRoutes() {
       if (!validateEnumOr400(status, VALID_STATUS, 'status', res)) return;
       if (!validateEnumOr400(priority, VALID_PRIORITY, 'priority', res)) return;
 
+      const dueAt = parseOptionalDateTime(due_at);
+      if (dueAt === null) {
+        return res.status(400).json({ error: 'Invalid due_at' });
+      }
+
       const result = await updateTodo(req.userId, id, {
         title,
         description,
         category,
         status,
         priority,
+        dueAt,
       });
 
       if (result && result.type === 'NO_FIELDS_TO_UPDATE') {
