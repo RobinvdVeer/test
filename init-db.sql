@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   user_id VARCHAR(255) UNIQUE NOT NULL,
+  email_address VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -17,6 +18,7 @@ CREATE TABLE IF NOT EXISTS todos (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_viewed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  due_date DATE,
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
@@ -33,3 +35,25 @@ CREATE INDEX IF NOT EXISTS idx_todos_user_status_created_at ON todos(user_id, st
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_updated_at ON todos(user_id, status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_created_at ON todos(user_id, category, created_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_updated_at ON todos(user_id, category, updated_at);
+
+-- Index for efficient upcoming-due-date lookups
+CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos(due_date);
+
+-- ============================================================
+-- Migration snippet: run this against an existing database to
+-- add the new columns used by the email-reminder feature.
+--
+--   psql $DATABASE_URL -f init-db.sql -t
+--   # Then copy-paste the migration block below and run:
+--   psql $DATABASE_URL -c "<migration SQL>"
+-- ============================================================
+--
+-- -- 1. Add due_date column to todos (nullable, not all todos have deadlines)
+-- ALTER TABLE todos ADD COLUMN IF NOT EXISTS due_date DATE;
+--
+-- -- 2. Add email_address column to users (nullable, not all users have email configured)
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS email_address VARCHAR(255);
+--
+-- -- 3. Add index for upcoming-due-date lookups
+-- CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos(due_date);
+
