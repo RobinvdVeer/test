@@ -22,48 +22,103 @@
       "Todo": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "user_id": { "type": "string" },
-          "title": { "type": "string" },
-          "description": { "type": "string", "nullable": true },
-          "category": { "type": "string", "nullable": true },
-          "due_date": { "type": "string", "format": "date-time", "nullable": true },
+          "id": {
+            "type": "integer"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "status": {
             "type": "string",
-            "enum": ["pending", "in_progress", "completed"],
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed"
+            ],
             "default": "pending"
           },
           "priority": {
             "type": "string",
-            "enum": ["low", "medium", "high"],
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
             "default": "medium"
           },
-          "created_at": { "type": "string", "format": "date-time" },
-          "updated_at": { "type": "string", "format": "date-time" },
-          "last_viewed": { "type": "string", "format": "date-time" }
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_viewed": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "TodoInput": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "description": { "type": "string", "nullable": true },
-          "category": { "type": "string", "nullable": true },
-          "due_date": { "type": "string", "format": "date-time", "nullable": true },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "status": {
             "type": "string",
-            "enum": ["pending", "in_progress", "completed"]
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed"
+            ]
           },
           "priority": {
             "type": "string",
-            "enum": ["low", "medium", "high"]
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
           }
         }
       },
       "Error": {
         "type": "object",
         "properties": {
-          "error": { "type": "string" }
+          "error": {
+            "type": "string"
+          }
         }
       }
     },
@@ -72,7 +127,9 @@
         "description": "Bad request",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/Error" }
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
           }
         }
       },
@@ -80,7 +137,9 @@
         "description": "Not found",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/Error" }
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
           }
         }
       },
@@ -88,7 +147,9 @@
         "description": "Internal server error",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/Error" }
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
           }
         }
       }
@@ -103,7 +164,9 @@
             "description": "OpenAPI 3 document",
             "content": {
               "application/json": {
-                "schema": { "type": "object" }
+                "schema": {
+                  "type": "object"
+                }
               }
             }
           }
@@ -118,7 +181,9 @@
             "description": "OpenAPI 3 document",
             "content": {
               "application/json": {
-                "schema": { "type": "object" }
+                "schema": {
+                  "type": "object"
+                }
               }
             }
           }
@@ -133,7 +198,9 @@
             "description": "OIDC client configuration",
             "content": {
               "application/json": {
-                "schema": { "type": "object" }
+                "schema": {
+                  "type": "object"
+                }
               }
             }
           }
@@ -148,7 +215,9 @@
             "description": "HTML application shell",
             "content": {
               "text/html": {
-                "schema": { "type": "string" }
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -163,7 +232,9 @@
             "description": "HTML login page",
             "content": {
               "text/html": {
-                "schema": { "type": "string" }
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -178,7 +249,9 @@
             "description": "HTML callback page",
             "content": {
               "text/html": {
-                "schema": { "type": "string" }
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -221,9 +294,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "active": { "type": "boolean" },
-                    "frequency_millis": { "type": "integer" },
-                    "frequency_hours": { "type": "integer" }
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "frequency_millis": {
+                      "type": "integer"
+                    },
+                    "frequency_hours": {
+                      "type": "integer"
+                    }
                   }
                 }
               }
@@ -245,10 +324,19 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "frequency_hours": { "type": "integer", "minimum": 1, "maximum": 720 },
-                  "active": { "type": "boolean" }
+                  "frequency_hours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
                 },
-                "required": ["frequency_hours", "active"]
+                "required": [
+                  "frequency_hours",
+                  "active"
+                ]
               }
             }
           }
@@ -261,13 +349,21 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean" },
+                    "success": {
+                      "type": "boolean"
+                    },
                     "config": {
                       "type": "object",
                       "properties": {
-                        "active": { "type": "boolean" },
-                        "frequency_millis": { "type": "integer" },
-                        "frequency_hours": { "type": "integer" }
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "frequency_millis": {
+                          "type": "integer"
+                        },
+                        "frequency_hours": {
+                          "type": "integer"
+                        }
                       }
                     }
                   }
@@ -275,7 +371,9 @@
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
         }
       }
     },
@@ -295,8 +393,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "last_email_sent": { "type": "string", "format": "date-time", "nullable": true },
-                    "last_checked_at": { "type": "string", "format": "date-time", "nullable": true }
+                    "last_email_sent": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "last_checked_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
                   }
                 }
               }
@@ -321,10 +427,14 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "count": { "type": "integer" },
+                    "count": {
+                      "type": "integer"
+                    },
                     "todos": {
                       "type": "array",
-                      "items": { "$ref": "#/components/schemas/Todo" }
+                      "items": {
+                        "$ref": "#/components/schemas/Todo"
+                      }
                     }
                   }
                 }
@@ -336,7 +446,7 @@
     },
     "/email-reminders/send-all": {
       "post": {
-        "summary": "Send reminder emails to all users (admin only)",
+        "summary": "Send reminder emails to all users",
         "security": [
           {
             "bearerAuth": []
@@ -350,12 +460,18 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean" },
+                    "success": {
+                      "type": "boolean"
+                    },
                     "result": {
                       "type": "object",
                       "properties": {
-                        "successCount": { "type": "integer" },
-                        "failureCount": { "type": "integer" }
+                        "successCount": {
+                          "type": "integer"
+                        },
+                        "failureCount": {
+                          "type": "integer"
+                        }
                       }
                     }
                   }
@@ -363,8 +479,12 @@
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/ServerError" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     },
@@ -377,8 +497,20 @@
           }
         ],
         "parameters": [
-          { "name": "category", "in": "query", "schema": { "type": "string" } },
-          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "sort_by",
             "in": "query",
@@ -397,12 +529,21 @@
           {
             "name": "limit",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
           },
           {
             "name": "offset",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 0, "default": 0 }
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
           }
         ],
         "responses": {
@@ -412,12 +553,16 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/Todo" }
+                  "items": {
+                    "$ref": "#/components/schemas/Todo"
+                  }
                 }
               }
             }
           },
-          "500": { "$ref": "#/components/responses/ServerError" }
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "post": {
@@ -433,8 +578,14 @@
             "application/json": {
               "schema": {
                 "allOf": [
-                  { "$ref": "#/components/schemas/TodoInput" },
-                  { "required": ["title"] }
+                  {
+                    "$ref": "#/components/schemas/TodoInput"
+                  },
+                  {
+                    "required": [
+                      "title"
+                    ]
+                  }
                 ]
               }
             }
@@ -445,18 +596,31 @@
             "description": "Created todo",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Todo" }
+                "schema": {
+                  "$ref": "#/components/schemas/Todo"
+                }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/ServerError" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     },
     "/todos/{id}": {
       "parameters": [
-        { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
       ],
       "get": {
         "summary": "Get todo",
@@ -470,12 +634,18 @@
             "description": "Todo",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Todo" }
+                "schema": {
+                  "$ref": "#/components/schemas/Todo"
+                }
               }
             }
           },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/ServerError" }
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "put": {
@@ -489,7 +659,9 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/TodoInput" }
+              "schema": {
+                "$ref": "#/components/schemas/TodoInput"
+              }
             }
           }
         },
@@ -498,13 +670,21 @@
             "description": "Updated todo",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Todo" }
+                "schema": {
+                  "$ref": "#/components/schemas/Todo"
+                }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/ServerError" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "delete": {
@@ -518,8 +698,12 @@
           "200": {
             "description": "Deleted todo"
           },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/ServerError" }
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     }

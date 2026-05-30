@@ -95,7 +95,7 @@ Complete user documentation covering:
 
 1. **Time-Based Filtering**: Only emails for todos with due_date within 2 days
 2. **Frequency Control**: Users can configure minimum time between emails (default: 24h)
-3. **Solaris Reminders**: Users can enable/disable reminders globally
+3. **Global Reminders**: Users can enable/disable reminders globally
 4. **Open Source**: Only uses Node.js, Nodemailer, and PostgreSQL
 5. **Scalable**: Worker service runs independently with health checks
 6. **Secure**: SMTP credentials stored in secrets, not hardcoded

@@ -126,7 +126,7 @@ Successfully implemented a complete email reminder system for todos due within 2
                       └───────────────────────────────────────────────┘
 
 HTTP API Calls:
-- POST /mail-trigger (admin)
+
 - GET /me/email-reminders/config
 - GET /me/email-reminders/last-sent
 ```

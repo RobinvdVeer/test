@@ -24,16 +24,9 @@ Run migrations to add required tables and columns:
 
 ```bash
 # Using postgres console
-psql -U todouser -d tododb -f migrations/add_email_reminders.sql
+psql -U todouser -d tododb -f migrations/001_add_email_reminders.sql
 ```
 
-Or using the automated migration system (if implemented in your deployment):
-
-```bash
-npx knex migrate:latest
-```
-
-### 2. Environment Configuration
 
 Add the following to your `.env` file:
 
@@ -197,7 +190,7 @@ curl -X PUT http://localhost:3000/api/me/email-reminders/config \
   -d '{"frequency_hours": 1}'
 ```
 
-4. Manually trigger if needed (admin):
+4. Manually trigger if needed (optional):
 ```bash
 curl -X POST http://localhost:3000/api/email-reminders/send-all \
   -H "Authorization: Bearer <admin-jwt-token>"
