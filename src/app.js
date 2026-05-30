@@ -7,7 +7,7 @@ const { authMiddleware } = require('./middleware/user');
 const { ensureUserMiddleware } = require('./middleware/ensure-user');
 const { registerMetricsRoutes } = require('./routes/metrics');
 const { registerTodosRoutes } = require('./routes/todos');
-const { registerRoutes as registerEmailReminderRoutes } = require('./routes/emailReminders');
+const { registerRoutes: registerEmailReminderRoutes } = require('./routes/emailReminders');
 
 function createApp() {
   const app = express();
@@ -58,7 +58,7 @@ function createApp() {
   registerMetricsRoutes(app, startTime);
 
   app.use('/todos', authMiddleware, ensureUserMiddleware, registerTodosRoutes());
-app.use('/email-reminders', registerEmailReminderRoutes());
+  app.use('/email-reminders', registerEmailReminderRoutes());
 
   return app;
 }

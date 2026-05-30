@@ -30,8 +30,8 @@ spec:
       - name: email-worker
         securityContext:
           {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-        image: "{{ .Values.image.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        image: "{{ .Values.image.app.repository }}:{{ .Values.image.app.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.app.pullPolicy }}
         ports:
         - name: http
           containerPort: {{ .Values.service.emailWorker.port }}

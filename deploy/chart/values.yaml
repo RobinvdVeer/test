@@ -1,4 +1,4 @@
-replicaCount: 1
+replicaCount: 2
 
 image:
   app:
@@ -19,6 +19,9 @@ service:
     type: ClusterIP
     port: 80
     targetPort: 3000
+  emailWorker:
+    type: ClusterIP
+    port: 80
   postgres:
     type: ClusterIP
     port: 5432
@@ -126,7 +129,13 @@ ingress:
           pathType: Prefix
   tls: []
 
-resources: {}
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
 
 podAnnotations: {}
 
@@ -135,3 +144,16 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+cron:
+  enabled: false
+
+smtp:
+  createSecrets: false
+  host: smtp.example.com
+  port: 587
+  user: user@example.com
+  pass: password
+  secure: false
+  fromEmail: no-reply@example.com
+  emailCheckInterval: 3600000

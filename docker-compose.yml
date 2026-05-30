@@ -100,6 +100,9 @@ services:
     build:
       context: .
     image: ghcr.io/robinvdveer/metrics-email-worker:latest
+    labels:
+      x-kong-internal: "true"
+      x-kong-route-regex: "true"
     container_name: metrics_server_email_worker
     ports:
       - "3001:3001"
