@@ -88,6 +88,25 @@ services:
       - .:/app
       - /app/node_modules
 
+  reminder-processor:
+    build:
+      context: .
+    image: ghcr.io/robinvdveer/metrics-server:latest
+    container_name: metrics_server_reminder_processor
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-todouser}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or .env file}@postgres:5432/${POSTGRES_DB:-tododb}}
+      NODE_ENV: development
+      REMINDER_INTERVAL_MS: ${REMINDER_INTERVAL_MS:-3600000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+    labels:
+      x-kong: "true"
+
 volumes:
   postgres_data:
   keycloak_postgres_data:

@@ -23,13 +23,13 @@ function rememberUser(userId, nowMs) {
   }
 }
 
-async function ensureUserExists(userId) {
+async function ensureUserExists(userId, email = null) {
   const nowMs = Date.now();
   if (isKnownUserFresh(userId, nowMs)) return;
 
   await getPool().query(
-    'INSERT INTO users (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
-    [userId]
+    'INSERT INTO users (user_id, email) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING',
+    [userId, email || null]
   );
 
   rememberUser(userId, nowMs);

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS todos (
   category VARCHAR(100),
   status VARCHAR(50) DEFAULT 'pending',
   priority VARCHAR(50) DEFAULT 'medium',
+  due_date TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_viewed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -29,6 +30,8 @@ CREATE INDEX IF NOT EXISTS idx_todos_user_status_last_viewed ON todos(user_id, s
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_last_viewed ON todos(user_id, category, last_viewed);
 CREATE INDEX IF NOT EXISTS idx_todos_user_created_at ON todos(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_updated_at ON todos(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos(due_date);
+CREATE INDEX IF NOT EXISTS idx_todos_due_date_status ON todos(due_date, status);
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_created_at ON todos(user_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_updated_at ON todos(user_id, status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_created_at ON todos(user_id, category, created_at);

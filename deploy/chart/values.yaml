@@ -45,6 +45,15 @@ app:
     redirectUri: http://localhost:3000/auth/callback
     postLogoutRedirectUri: http://localhost:3000/login
     scope: openid profile email
+  email:
+    smtp:
+      host: ""
+      port: 587
+      user: ""
+      pass: ""
+      secure: false
+      from: ""
+    reminderIntervalMs: 3600000
 
 secrets:
   create: false
