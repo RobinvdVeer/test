@@ -98,14 +98,14 @@ function validateStatusPriority({ status, priority }) {
   }
 }
 
-async function createTodo(userId, { title, description, category, status, priority }) {
+async function createTodo(userId, { title, description, category, status, priority, due_date }) {
   const statusToUse = status || DEFAULT_TODO_STATUS;
   const priorityToUse = priority || DEFAULT_TODO_PRIORITY;
 
   validateStatusPriority({ status: statusToUse, priority: priorityToUse });
 
   const result = await getPool().query(
-    'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+    'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed, due_date) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7) RETURNING *',
     [
       userId,
       title,
@@ -113,6 +113,7 @@ async function createTodo(userId, { title, description, category, status, priori
       category || null,
       statusToUse,
       priorityToUse,
+      due_date || null,
     ]
   );
 
@@ -142,7 +143,7 @@ WHERE id = $1 AND user_id = $2
   return result.rows[0] || null;
 }
 
-async function updateTodo(userId, id, { title, description, category, status, priority }) {
+async function updateTodo(userId, id, { title, description, category, status, priority, due_date }) {
   validateStatusPriority({ status, priority });
 
   // Update only provided fields
@@ -169,6 +170,10 @@ async function updateTodo(userId, id, { title, description, category, status, pr
   if (priority !== undefined) {
     updateFields.push(`priority = $${paramCount++}`);
     updateValues.push(priority);
+  }
+  if (due_date !== undefined) {
+    updateFields.push(`due_date = $${paramCount++}`);
+    updateValues.push(due_date || null);
   }
 
   if (updateFields.length === 0) {
