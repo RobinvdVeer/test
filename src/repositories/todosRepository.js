@@ -199,10 +199,63 @@ async function deleteTodo(userId, id) {
   return result.rows[0] || null;
 }
 
+/**
+ * Find all non-completed todos for a user with upcoming due dates.
+ *
+ * @param {string}  userId          - The user's ID
+ * @param {number}  daysThreshold   - Number of days from now to look ahead (default 2)
+ * @returns {Promise<Array<{ todo: object, userEmail: string | null }>>}
+ */
+async function getTodosWithUpcomingDueDate(userId, daysThreshold = 2) {
+  const query = `
+    SELECT
+      todos.id,
+      todos.user_id,
+      todos.title,
+      todos.description,
+      todos.category,
+      todos.status,
+      todos.priority,
+      todos.created_at,
+      todos.updated_at,
+      todos.last_viewed,
+      todos.due_date,
+      users.email_address AS userEmail
+    FROM todos
+    INNER JOIN users ON todos.user_id = users.user_id
+    WHERE todos.user_id = $1
+      AND todos.due_date IS NOT NULL
+      AND todos.status != 'completed'
+      AND todos.due_date <= (NOW()::date + $2::int * INTERVAL '1 day')
+      AND todos.due_date >= NOW()::date
+    ORDER BY todos.due_date ASC
+  `;
+
+  const result = await getPool().query(query, [userId, daysThreshold]);
+
+  return result.rows.map((row) => ({
+    todo: {
+      id: row.id,
+      user_id: row.user_id,
+      title: row.title,
+      description: row.description,
+      category: row.category,
+      status: row.status,
+      priority: row.priority,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      last_viewed: row.last_viewed,
+      due_date: row.due_date,
+    },
+    userEmail: row.userEmail || null,
+  }));
+}
+
 module.exports = {
   listTodos,
   createTodo,
   getTodoAndUpdateLastViewed,
   updateTodo,
   deleteTodo,
+  getTodosWithUpcomingDueDate,
 };
