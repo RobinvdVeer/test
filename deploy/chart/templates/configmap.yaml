@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "metrics-server.fullname" . }}
+  labels:
+    {{- include "metrics-server.labels" . | nindent 4 }}
+data:
+  frontend-url: {{ .Values.app.publicUrl | quote }}
+  from-email: {{ .Values.smtp.fromEmail | default "noreply@example.com" | quote }}
+  email-check-interval: {{ .Values.smtp.emailCheckInterval | default "3600000" | quote }}
+  email-secure: {{ .Values.smtp.secure | default "false" | quote }}

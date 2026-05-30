@@ -1,20 +1,18 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-app
+  name: {{ .Release.Name }}-email-worker
   labels:
     app.kubernetes.io/name: {{ .Chart.Name }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: app
+    app.kubernetes.io/component: email-worker
 spec:
-  type: {{ .Values.service.app.type }}
+  type: {{ .Values.service.emailWorker.type }}
   ports:
-    - port: {{ .Values.service.app.port }}
+    - port: {{ .Values.service.emailWorker.port }}
       targetPort: http
       protocol: TCP
       name: http
   selector:
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: app
-  resources:
-    {{- toYaml .Values.resources | nindent 4 }}
+    app.kubernetes.io/component: email-worker

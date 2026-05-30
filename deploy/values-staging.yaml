@@ -49,3 +49,41 @@ externalSecrets:
     remoteRef:
       key: metrics-server/staging/keycloak
       property: admin-password
+  emailHost:
+    remoteRef:
+      key: metrics-server/staging/email
+      property: smtp-host
+  emailPort:
+    remoteRef:
+      key: metrics-server/staging/email
+      property: smtp-port
+  emailUser:
+    remoteRef:
+      key: metrics-server/staging/email
+      property: smtp-user
+  emailPass:
+    remoteRef:
+      key: metrics-server/staging/email
+      property: smtp-pass
+
+todo:
+  dueAlertDays: 2
+  defaultFrequencyHours: 24
+
+smtp:
+  createSecrets: false
+  host: smtp.gmail.com
+  port: 587
+  user: your-email@gmail.com
+  pass: app-password
+  secure: false
+  fromEmail: noreply@metrics-server.local
+  emailCheckInterval: 3600000 # 1 hour in milliseconds
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi

@@ -1,6 +1,6 @@
 const { createApp } = require('./src/app');
 const { getConfig } = require('./src/config');
-const { getPool, closePool } = require('./src/db/pool');
+const { getPool, closePool, initializeDatabase } = require('./src/db/pool');
 
 const { PORT } = getConfig();
 
@@ -17,6 +17,14 @@ if (require.main === module) {
   }
 
   pool = getPool();
+  try {
+    console.log('Initializing database...');
+    await initializeDatabase();
+    console.log('Database initialization complete');
+  } catch (err) {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  }
 
   server = app.listen(PORT, () => {
     console.log(`Todo app running on http://localhost:${PORT}`);

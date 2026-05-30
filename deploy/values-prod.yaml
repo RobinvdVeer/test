@@ -1,0 +1,121 @@
+# Production values for metrics-server
+
+replicaCount: 2
+
+image:
+  app:
+    repository: ghcr.io/robinvdveer/metrics-server
+    tag: latest
+  imagePullSecrets:
+    - name: container-registry-credentials
+
+app:
+  publicUrl: https://app.example.com
+  auth:
+    issuerUrl: https://keycloak.example.com/realms/todos
+    authorizeUrl: https://keycloak.example.com/realms/todos/protocol/openid-connect/auth
+    tokenUrl: https://keycloak.example.com/realms/todos/protocol/openid-connect/token
+    logoutUrl: https://keycloak.example.com/realms/todos/protocol/openid-connect/logout
+    redirectUri: https://app.example.com/auth/callback
+    postLogoutRedirectUri: https://app.example.com/login
+
+keycloak:
+  publicUrl: https://keycloak.example.com
+  hostname: keycloak.example.com
+  ingress:
+    enabled: true
+    host: keycloak.example.com
+    className: nginx
+    tls:
+      - secretName: keycloak-tls
+        hosts:
+          - keycloak.example.com
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ include "metrics-server.fullname" . }}-app
+              port:
+                number: 3000
+  tls:
+    - secretName: app-tls
+      hosts:
+        - app.example.com
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: cluster-secret-store
+    kind: ClusterSecretStore
+  database:
+    remoteRef:
+      key: metrics-server/prod/database
+      property: database-url
+  postgresPassword:
+    remoteRef:
+      key: metrics-server/prod/postgres
+      property: postgres-password
+  keycloakPostgresPassword:
+    remoteRef:
+      key: metrics-server/prod/keycloak-postgres
+      property: postgres-password
+  keycloakAdminPassword:
+    remoteRef:
+      key: metrics-server/prod/keycloak
+      property: admin-password
+  emailHost:
+    remoteRef:
+      key: metrics-server/prod/email
+      property: smtp-host
+  emailPort:
+    remoteRef:
+      key: metrics-server/prod/email
+      property: smtp-port
+  emailUser:
+    remoteRef:
+      key: metrics-server/prod/email
+      property: smtp-user
+  emailPass:
+    remoteRef:
+      key: metrics-server/prod/email
+      property: smtp-pass
+
+todo:
+  dueAlertDays: 2
+  defaultFrequencyHours: 24
+
+smtp:
+  createSecrets: false
+  host: smtp.example.com
+  port: 465
+  user: your-email@example.com
+  pass: your-password
+  secure: true
+  fromEmail: no-reply@example.com
+  emailCheckInterval: 3600000  # 1 hour
+
+appProtocol: http  # Set to https if using TLS
+
+resources:
+  limits:
+    cpu: 1
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+nodeSelector: {}
+
+affinity: {}
+
+tolerations: []

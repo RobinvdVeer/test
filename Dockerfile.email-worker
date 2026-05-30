@@ -1,0 +1,43 @@
+# Multi-stage build for email worker
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application code
+COPY src/ ./src/
+COPY openapi.json ./openapi.json
+
+# Production image
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Create non-root user (security best practice)
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Copy from builder
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules/.package-lock.json ./package-lock.json
+COPY --from=builder --chown=nodejs:nodejs /app/src ./src
+COPY --from=builder --chown=nodejs:nodejs /app/openapi.json ./openapi.json
+COPY --from=builder --chown=nodejs:nodejs /app/emailWorker.js ./emailWorker.js
+
+# Switch to non-root user
+USER nodejs
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/health', (r) => {if(r.statusCode!==200)process.exit(1)})"
+
+# Run the email worker
+CMD ["node", "emailWorker.js"]

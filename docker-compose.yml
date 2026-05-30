@@ -81,12 +81,42 @@ services:
       AUTH_REDIRECT_URI: ${AUTH_REDIRECT_URI:-http://localhost:3000/auth/callback}
       AUTH_POST_LOGOUT_REDIRECT_URI: ${AUTH_POST_LOGOUT_REDIRECT_URI:-http://localhost:3000/login}
       AUTH_SCOPE: ${AUTH_SCOPE:-openid profile email}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@metrics-server.local}
+      EMAIL_CHECK_INTERVAL: ${EMAIL_CHECK_INTERVAL:-3600000}
+      EMAIL_SECURE: ${EMAIL_SECURE:-false}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - .:/app
       - /app/node_modules
+
+  email-worker:
+    build:
+      context: .
+    image: ghcr.io/robinvdveer/metrics-email-worker:latest
+    container_name: metrics_server_email_worker
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-todouser}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or .env file}@postgres:5432/${POSTGRES_DB:-tododb}}
+      SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST in your environment or .env file}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:?set SMTP_USER in your environment or .env file}
+      SMTP_PASS: ${SMTP_PASS:?set SMTP_PASS in your environment or .env file}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@metrics-server.local}
+      EMAIL_CHECK_INTERVAL: ${EMAIL_CHECK_INTERVAL:-3600000}
+      EMAIL_SECURE: ${EMAIL_SECURE:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:

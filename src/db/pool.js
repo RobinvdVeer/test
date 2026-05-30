@@ -28,6 +28,16 @@ async function closePool() {
   await currentPool.end();
 }
 
+async function initializeDatabase() {
+  try {
+    await initializeMigrationsTable();
+    await applyMigrations();
+  } catch (err) {
+    console.error('Error initializing database:', err);
+    throw err;
+  }
+}
+
 module.exports = {
   getPool,
   closePool,

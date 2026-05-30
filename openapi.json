@@ -27,6 +27,7 @@
           "title": { "type": "string" },
           "description": { "type": "string", "nullable": true },
           "category": { "type": "string", "nullable": true },
+          "due_date": { "type": "string", "format": "date-time", "nullable": true },
           "status": {
             "type": "string",
             "enum": ["pending", "in_progress", "completed"],
@@ -48,6 +49,7 @@
           "title": { "type": "string" },
           "description": { "type": "string", "nullable": true },
           "category": { "type": "string", "nullable": true },
+          "due_date": { "type": "string", "format": "date-time", "nullable": true },
           "status": {
             "type": "string",
             "enum": ["pending", "in_progress", "completed"]
@@ -200,6 +202,169 @@
           "200": {
             "description": "Runtime metrics"
           }
+        }
+      }
+    },
+    "/email-reminders": {
+      "get": {
+        "summary": "Email reminders config",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email reminders configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "active": { "type": "boolean" },
+                    "frequency_millis": { "type": "integer" },
+                    "frequency_hours": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update email reminders config",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "frequency_hours": { "type": "integer", "minimum": 1, "maximum": 720 },
+                  "active": { "type": "boolean" }
+                },
+                "required": ["frequency_hours", "active"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "active": { "type": "boolean" },
+                        "frequency_millis": { "type": "integer" },
+                        "frequency_hours": { "type": "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/email-reminders/last-sent": {
+      "get": {
+        "summary": "Get last email status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Last email status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "last_email_sent": { "type": "string", "format": "date-time", "nullable": true },
+                    "last_checked_at": { "type": "string", "format": "date-time", "nullable": true }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/email-reminders/due-todos": {
+      "get": {
+        "summary": "Get user's due todos",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Due todos list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "todos": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Todo" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/email-reminders/send-all": {
+      "post": {
+        "summary": "Send reminder emails to all users (admin only)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Emails sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "successCount": { "type": "integer" },
+                        "failureCount": { "type": "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "500": { "$ref": "#/components/responses/ServerError" }
         }
       }
     },

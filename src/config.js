@@ -28,6 +28,20 @@ function getConfig() {
       postLogoutRedirectUri: process.env.AUTH_POST_LOGOUT_REDIRECT_URI || 'http://localhost:3000/login',
       scope: process.env.AUTH_SCOPE || 'openid profile email',
     },
+    todo: {
+      dueAlertDays: Number(process.env.TODO_DUE_ALERT_DAYS) || 2,
+      defaultFrequencyHours: Number(process.env.EMAIL_DEFAULT_FREQUENCY_HOURS) || 24,
+    },
+    smtp: {
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587,
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+      secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_SECURE === '1',
+      fromEmail: process.env.FROM_EMAIL || process.env.SMTP_USER,
+      emailCheckInterval: process.env.EMAIL_CHECK_INTERVAL ? Number(process.env.EMAIL_CHECK_INTERVAL) : 60 * 60 * 1000,
+    },
+    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   };
 }
 

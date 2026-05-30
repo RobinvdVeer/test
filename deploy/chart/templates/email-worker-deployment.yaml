@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "metrics-server.fullname" . }}-email-worker
+  labels:
+    {{- include "metrics-server.labels" . | nindent 4 }}
+    component: email-worker
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "metrics-server.selectorLabels" . | nindent 6 }}
+      component: email-worker
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "metrics-server.selectorLabels" . | nindent 8 }}
+        component: email-worker
+    spec:
+      {{- with .Values.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "metrics-server.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: email-worker
+        securityContext:
+          {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+        image: "{{ .Values.image.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.emailWorker.port }}
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "metrics-server.fullname" . }}-db
+              key: database-url
+        - name: SMTP_HOST
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "metrics-server.fullname" . }}-email
+              key: smtp-host
+        - name: SMTP_PORT
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "metrics-server.fullname" . }}-email
+              key: smtp-port
+        - name: SMTP_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "metrics-server.fullname" . }}-email
+              key: smtp-user
+        - name: SMTP_PASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "metrics-server.fullname" . }}-email
+              key: smtp-pass
+        - name: FRONTEND_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "metrics-server.fullname" . }}
+              key: frontend-url
+        - name: FROM_EMAIL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "metrics-server.fullname" . }}
+              key: from-email
+        - name: EMAIL_CHECK_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "metrics-server.fullname" . }}
+              key: email-check-interval
+        - name: EMAIL_SECURE
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "metrics-server.fullname" . }}
+              key: email-secure
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
