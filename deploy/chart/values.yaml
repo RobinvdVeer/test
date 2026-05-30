@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   app:
     repository: ghcr.io/robinvdveer/metrics-server
-    tag: latest
+    tag: "latest"
     pullPolicy: IfNotPresent
   postgres:
     repository: postgres
@@ -45,6 +45,19 @@ app:
     redirectUri: http://localhost:3000/auth/callback
     postLogoutRedirectUri: http://localhost:3000/login
     scope: openid profile email
+  notifications:
+    enabled: false
+    lookAheadDays: 2
+    intervalMs: 0
+    minDaysSinceLastEmail: 0
+    email:
+      secretName: metrics-server-email
+      secretKeyHost: smtp-host
+      secretKeyPort: smtp-port
+      secretKeyUser: smtp-user
+      secretKeyPassword: smtp-password
+      secretKeyFrom: smtp-from
+      port: 587
 
 secrets:
   create: false

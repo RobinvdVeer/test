@@ -58,6 +58,15 @@ function createApp() {
 
   app.use('/todos', authMiddleware, ensureUserMiddleware, registerTodosRoutes());
 
+  // Start notification scheduler if enabled
+  if (config.notifications?.enabled) {
+    const { startScheduler } = require('./scheduler/notifications');
+    const stopScheduler = startScheduler();
+
+    // Store stop function on app for graceful shutdown
+    app.locals.stopScheduler = stopScheduler;
+  }
+
   return app;
 }
 

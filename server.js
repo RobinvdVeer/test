@@ -29,6 +29,12 @@ if (require.main === module) {
     console.log('SIGTERM signal received: closing HTTP server');
     if (!server) return;
 
+    // Stop notification scheduler if running
+    const stopScheduler = app.locals?.stopScheduler;
+    if (typeof stopScheduler === 'function') {
+      stopScheduler();
+    }
+
     server.close(() => {
       console.log('HTTP server closed');
       closePool()

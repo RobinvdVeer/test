@@ -14,6 +14,19 @@ app:
     logoutUrl: http://keycloak.metrics-server.local/realms/todos/protocol/openid-connect/logout
     redirectUri: http://app.metrics-server.local/auth/callback
     postLogoutRedirectUri: http://app.metrics-server.local/login
+  notifications:
+    enabled: true
+    lookAheadDays: 2
+    intervalMs: 0
+    minDaysSinceLastEmail: 0
+    email:
+      secretName: metrics-server-email
+      secretKeyHost: smtp-host
+      secretKeyPort: smtp-port
+      secretKeyUser: smtp-user
+      secretKeyPassword: smtp-password
+      secretKeyFrom: smtp-from
+      port: 587
 
 keycloak:
   publicUrl: http://keycloak.metrics-server.local
@@ -49,3 +62,10 @@ externalSecrets:
     remoteRef:
       key: metrics-server/staging/keycloak
       property: admin-password
+  email:
+    remoteRef:
+      key: metrics-server/staging/email
+    portProperty: smtp-port
+    userProperty: smtp-user
+    passwordProperty: smtp-password
+    fromProperty: smtp-from

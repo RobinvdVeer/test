@@ -12,6 +12,31 @@ function getConfig() {
   const tokenUrl = process.env.KEYCLOAK_TOKEN_URL || buildUrl(issuerUrl, 'protocol/openid-connect/token');
   const logoutUrl = process.env.KEYCLOAK_LOGOUT_URL || buildUrl(issuerUrl, 'protocol/openid-connect/logout');
 
+  // Email configuration for notification scheduler
+  const emailConfig = {
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587,
+    user: process.env.EMAIL_USER,
+    password: process.env.EMAIL_PASSWORD,
+    from: process.env.EMAIL_FROM,
+    secure: process.env.EMAIL_SECURE === 'true',
+    tlsRejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
+  };
+
+  // Notification scheduler configuration
+  const notificationConfig = {
+    enabled: process.env.NOTIFICATIONS_ENABLED === 'true',
+    lookAheadDays: process.env.NOTIFICATIONS_LOOK_AHEAD_DAYS
+      ? Number(process.env.NOTIFICATIONS_LOOK_AHEAD_DAYS)
+      : 2,
+    intervalMs: process.env.NOTIFICATIONS_INTERVAL_MS
+      ? Number(process.env.NOTIFICATIONS_INTERVAL_MS)
+      : 0,
+    minDaysSinceLastEmail: process.env.NOTIFICATIONS_MIN_DAYS_SINCE_LAST_EMAIL
+      ? Number(process.env.NOTIFICATIONS_MIN_DAYS_SINCE_LAST_EMAIL)
+      : 0,
+  };
+
   return {
     PORT: process.env.PORT ? Number(process.env.PORT) : 3000,
     DATABASE_URL: process.env.DATABASE_URL,
@@ -28,6 +53,8 @@ function getConfig() {
       postLogoutRedirectUri: process.env.AUTH_POST_LOGOUT_REDIRECT_URI || 'http://localhost:3000/login',
       scope: process.env.AUTH_SCOPE || 'openid profile email',
     },
+    email: emailConfig,
+    notifications: notificationConfig,
   };
 }
 

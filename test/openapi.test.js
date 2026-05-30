@@ -47,7 +47,8 @@ test('openapi.json is a valid OpenAPI 3 document for implemented routes', async 
     '/health',
     '/metrics',
     '/todos',
-    '/todos/{id}'
+    '/todos/{id}',
+    '/todos/notifications'
   ]));
 });
 

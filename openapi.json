@@ -39,7 +39,9 @@
           },
           "created_at": { "type": "string", "format": "date-time" },
           "updated_at": { "type": "string", "format": "date-time" },
-          "last_viewed": { "type": "string", "format": "date-time" }
+          "last_viewed": { "type": "string", "format": "date-time" },
+          "due_date": { "type": "string", "format": "date-time", "nullable": true },
+          "email_sent_at": { "type": "string", "format": "date-time", "nullable": true }
         }
       },
       "TodoInput": {
@@ -55,13 +57,21 @@
           "priority": {
             "type": "string",
             "enum": ["low", "medium", "high"]
-          }
+          },
+          "due_date": { "type": "string", "format": "date-time", "nullable": true }
         }
       },
       "Error": {
         "type": "object",
         "properties": {
           "error": { "type": "string" }
+        }
+      },
+      "NotificationStatus": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "scheduled": { "type": "boolean" }
         }
       }
     },
@@ -354,6 +364,27 @@
             "description": "Deleted todo"
           },
           "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/todos/notifications": {
+      "get": {
+        "summary": "Check notification scheduler status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification scheduler configuration and status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NotificationStatus" }
+              }
+            }
+          },
           "500": { "$ref": "#/components/responses/ServerError" }
         }
       }

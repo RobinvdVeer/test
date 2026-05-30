@@ -81,6 +81,18 @@ services:
       AUTH_REDIRECT_URI: ${AUTH_REDIRECT_URI:-http://localhost:3000/auth/callback}
       AUTH_POST_LOGOUT_REDIRECT_URI: ${AUTH_POST_LOGOUT_REDIRECT_URI:-http://localhost:3000/login}
       AUTH_SCOPE: ${AUTH_SCOPE:-openid profile email}
+      # Notification scheduler (optional - set NOTIFICATIONS_ENABLED=true to enable)
+      NOTIFICATIONS_ENABLED: ${NOTIFICATIONS_ENABLED:-false}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_TLS_REJECT_UNAUTHORIZED: ${EMAIL_TLS_REJECT_UNAUTHORIZED:-true}
+      # Notification frequency (in milliseconds, 0 = default 6 hours)
+      NOTIFICATIONS_INTERVAL_MS: ${NOTIFICATIONS_INTERVAL_MS:-0}
+      NOTIFICATIONS_LOOK_AHEAD_DAYS: ${NOTIFICATIONS_LOOK_AHEAD_DAYS:-2}
+      NOTIFICATIONS_MIN_DAYS_SINCE_LAST_EMAIL: ${NOTIFICATIONS_MIN_DAYS_SINCE_LAST_EMAIL:-0}
     depends_on:
       postgres:
         condition: service_healthy

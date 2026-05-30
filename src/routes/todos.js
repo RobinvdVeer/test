@@ -12,7 +12,6 @@ const {
   normalizeSortBy,
   parseOptionalNonNegativeInt,
 } = require('../todos/rules');
-
 function withErrorHandling(logPrefix, handler) {
   return async (req, res) => {
     try {
@@ -65,7 +64,7 @@ function registerTodosRoutes() {
   router.post(
     '/',
     withErrorHandling('Error creating todo:', async (req, res) => {
-      const { title, description, category, status, priority } = req.body;
+      const { title, description, category, status, priority, due_date } = req.body;
 
       if (!title) {
         return res.status(400).json({ error: 'Title is required' });
@@ -80,6 +79,7 @@ function registerTodosRoutes() {
         category,
         status,
         priority,
+        due_date,
       });
 
       res.status(201).json(result);
@@ -110,7 +110,7 @@ function registerTodosRoutes() {
     '/:id',
     withErrorHandling('Error updating todo:', async (req, res) => {
       const { id } = req.params;
-      const { title, description, category, status, priority } = req.body;
+      const { title, description, category, status, priority, due_date } = req.body;
 
       if (!isValidNumericId(id)) {
         return res.status(400).json({ error: 'Invalid id' });
@@ -125,6 +125,7 @@ function registerTodosRoutes() {
         category,
         status,
         priority,
+        due_date,
       });
 
       if (result && result.type === 'NO_FIELDS_TO_UPDATE') {
@@ -155,6 +156,21 @@ function registerTodosRoutes() {
       }
 
       res.json({ message: 'Todo deleted successfully', deletedTodo: result });
+    })
+  );
+
+  // GET /todos/notifications - Notification scheduler status
+  router.get(
+    '/notifications',
+    withErrorHandling('Error fetching notification status:', async (req, res) => {
+      const { getConfig } = require('../config');
+      const config = getConfig();
+      const notifConfig = config.notifications || {};
+
+      res.json({
+        message: 'Notification scheduler',
+        scheduled: notifConfig.enabled || false,
+      });
     })
   );
 

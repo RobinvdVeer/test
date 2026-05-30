@@ -63,6 +63,38 @@ spec:
               value: {{ .Values.app.auth.postLogoutRedirectUri | quote }}
             - name: AUTH_SCOPE
               value: {{ .Values.app.auth.scope | quote }}
+            {{- if .Values.app.notifications.enabled }}
+            - name: NOTIFICATIONS_ENABLED
+              value: "true"
+            - name: NOTIFICATIONS_LOOK_AHEAD_DAYS
+              value: {{ .Values.app.notifications.lookAheadDays | quote }}
+            - name: NOTIFICATIONS_INTERVAL_MS
+              value: {{ .Values.app.notifications.intervalMs | quote }}
+            - name: NOTIFICATIONS_MIN_DAYS_SINCE_LAST_EMAIL
+              value: {{ .Values.app.notifications.minDaysSinceLastEmail | quote }}
+            - name: EMAIL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.notifications.email.secretName }}
+                  key: {{ .Values.app.notifications.email.secretKeyHost }}
+            - name: EMAIL_PORT
+              value: {{ .Values.app.notifications.email.port | quote }}
+            - name: EMAIL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.notifications.email.secretName }}
+                  key: {{ .Values.app.notifications.email.secretKeyUser }}
+            - name: EMAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.notifications.email.secretName }}
+                  key: {{ .Values.app.notifications.email.secretKeyPassword }}
+            - name: EMAIL_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.notifications.email.secretName }}
+                  key: {{ .Values.app.notifications.email.secretKeyFrom }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /health
