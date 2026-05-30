@@ -60,6 +60,41 @@ test('served /openapi.json matches committed openapi.json', async () => {
   expect(queryMock).not.toHaveBeenCalled();
 });
 
+test('committed openapi.json includes all email reminder endpoints', async () => {
+  const emailReminderPaths = [
+    '/email-reminders',
+    '/email-reminders/config',
+    '/email-reminders/last-sent',
+    '/email-reminders/due-todos',
+    '/email-reminders/send-all',
+  ];
+
+  emailReminderPaths.forEach(path => {
+    expect(Object.keys(openApiDocument.paths)).toContain(path);
+  });
+});
+
+test('email reminder endpoints have proper OpenAPI structure', async () => {
+  expect(openApiDocument.paths['/email-reminders']).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/config']).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/last-sent']).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/due-todos']).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/send-all']).toBeDefined();
+
+  // Validate config endpoint structure
+  expect(openApiDocument.paths['/email-reminders/config'].get).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/config'].put).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/config'].get.security).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/config'].get.security[0]).toEqual(['bearerAuth']);
+
+  // Validate send-all endpoint structure
+  expect(openApiDocument.paths['/email-reminders/send-all'].post.security).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/send-all'].post.responses).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/send-all'].post.responses['200']).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/send-all'].post.responses['400']).toBeDefined();
+  expect(openApiDocument.paths['/email-reminders/send-all'].post.responses['500']).toBeDefined();
+});
+
 test('scripts/check-openapi.js contract check passes', () => {
   execFileSync('node', ['scripts/check-openapi.js'], { stdio: 'ignore' });
 });

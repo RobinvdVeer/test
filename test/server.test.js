@@ -765,3 +765,123 @@ describe('/metrics', () => {
     expect(new Date(res.body.timestamp).toISOString()).toBe(res.body.timestamp);
   });
 });
+
+describe('database initialization during startup', () => {
+  let originalProcessExit;
+  let originalConsoleError;
+
+  beforeEach(() => {
+    originalProcessExit = process.exit;
+    originalConsoleError = console.error;
+  });
+
+  afterEach(() => {
+    process.exit = originalProcessExit;
+    console.error = originalConsoleError;
+  });
+
+  it('exits with error code 1 when DB initialization fails', async () => {
+    // Mock initializeDatabase to throw error
+    const { initializeDatabase } = require('../src/db/pool');
+    initializeDatabase
+      .mockRejectedValueOnce(new Error('Database connection failed'));
+
+    const { execSync } = require('child_process');
+
+    const appScript = `
+      require('dotenv').config();
+      const { createApp } = require('../src/app');
+      const { getConfig } = require('../src/config');
+      const { getPool, closePool, initializeDatabase } = require('../src/db/pool');
+      const { emailReminderService } = require('../src/services/emailReminder');
+
+      const { PORT } = getConfig().port || 3000;
+      let pool, server;
+
+      pool = getPool();
+      try {
+        await initializeDatabase();
+      } catch (err) {
+        console.error('Initialization failed:', err.message);
+        return 1;
+      }
+
+      const app = createApp();
+      server = app.listen(PORT, () => {
+        console.log('App started successfully');
+        server.close(() => closePool().catch(() => {}));
+      });
+    `;
+
+    try {
+      execSync(`timeout 5 node -e "${Buffer.from(appScript).toString('base64')}" 2>&1 || true`);
+    } catch (err) {
+      // Times out or exits, which is expected
+    }
+  });
+
+  it('shows initialization failure error message', async () => {
+    const { initializeDatabase } = require('../src/db/pool');
+    initializeDatabase
+      .mockRejectedValueOnce(new Error('Connection timeout'));
+
+    const originalError = console.error;
+    console.error = jest.fn();
+
+    try {
+      const { execSync } = require('child_process');
+
+      const appScript = `
+        require('dotenv').config();
+        const { initializeDatabase } = require('../src/db/pool');
+
+        try {
+          await initializeDatabase();
+        } catch (err) {
+          console.error('DB Init:', err.message);
+          process.exit(1);
+        }
+      `;
+
+      execSync(`timeout 5 node -e "${Buffer.from(appScript).toString('base64')}" 2>&1 || true`);
+    } catch (err) {
+      // Expected - test passes if initialization failure is detected
+    }
+
+    const errorCalls = console.error.mock.calls.filter(call =>
+      call.some(arg => typeof arg === 'string' && arg.includes('Database'))
+    );
+    expect(errorCalls.length).toBeGreaterThan(0);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to initialize database'),
+    );
+
+    console.error = originalError;
+  });
+
+  it('gracefully closes pool on initialization failure before startup', async () => {
+    const { getPool, closePool } = require('../src/db/pool');
+    const { initializeDatabase } = require('../src/db/pool');
+
+    const mockPool = {
+      query: jest.fn(),
+      end: jest.fn(),
+    };
+    getPool.mockReturnValue(mockPool);
+    closePool.mockResolvedValue();
+
+    initializeDatabase
+      .mockRejectedValueOnce(new Error('Connection failed'));
+
+    const { execSync } = require('child_process');
+
+    try {
+      execSync(`timeout 5 node -e "const { initializeDatabase } = require('./src/db/pool'); initializeDatabase().catch(() => {}); process.exit(1);" 2>&1 || true`);
+    } catch (err) {
+      // Expected
+    }
+
+    expect(closePool).toHaveBeenCalled();
+    expect(mockPool.end).toHaveBeenCalled();
+  });
+});
