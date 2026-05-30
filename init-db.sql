@@ -2,6 +2,10 @@
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   user_id VARCHAR(255) UNIQUE NOT NULL,
+  email VARCHAR(255),
+  email_enabled BOOLEAN DEFAULT FALSE,
+  email_frequency_hours INTEGER DEFAULT 24,
+  last_email_sent_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

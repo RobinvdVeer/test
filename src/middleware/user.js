@@ -1,5 +1,6 @@
 const { getConfig } = require('../config');
 const { verifyJwt } = require('../auth/jwt');
+const { upsertUserEmail } = require('../repositories/usersRepository');
 
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -26,6 +27,15 @@ async function authMiddleware(req, res, next) {
   }
 
   req.userId = payload.sub;
+
+  // Extract and store the email from the JWT (Keycloak provides 'email' claim)
+  const email = payload.email || payload.preferred_username || null;
+  if (email && typeof email === 'string') {
+    upsertUserEmail(req.userId, email).catch((err) => {
+      console.error('[middleware] Failed to upsert user email:', err.message);
+    });
+  }
+
   next();
 }
 
