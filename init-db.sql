@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS todos (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_viewed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  due_date DATE,
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
@@ -33,3 +34,4 @@ CREATE INDEX IF NOT EXISTS idx_todos_user_status_created_at ON todos(user_id, st
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_updated_at ON todos(user_id, status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_created_at ON todos(user_id, category, created_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_updated_at ON todos(user_id, category, updated_at);
+CREATE INDEX IF NOT EXISTS idx_todos_user_due_date ON todos(user_id, due_date);
