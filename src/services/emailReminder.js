@@ -1,4 +1,10 @@
 const nodemailer = require('nodemailer');
+const escapeHtml = (str) => {
+  if (typeof str !== 'string') return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+};
 const { getPool } = require('../db/pool');
 
 // Configuration for scheduled task
@@ -175,8 +181,8 @@ async function sendUserEmail(transporter, userId, todos) {
   // Format todos for email
   const todoListHtml = todos.map(todo => `
     <li>
-      <strong>${todo.title}</strong> ${todo.due_date ? `(Due: ${todo.due_date})` : ''}
-      ${todo.description ? `<br><small>${todo.description}</small>` : ''}
+      <strong>${escapeHtml(todo.title)}</strong> ${todo.due_date ? `(Due: ${todo.due_date})` : ''}
+      ${todo.description ? `<br><small>${escapeHtml(todo.description)}</small>` : ''}
       ${todo.status !== 'pending' ? `<br><small>Status: ${todo.status}</small>` : ''}
     </li>
   `).join('');

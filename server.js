@@ -16,15 +16,20 @@ if (require.main === module) {
     process.exit(1);
   }
 
-  pool = getPool();
-  try {
-    console.log('Initializing database...');
-    await initializeDatabase();
-    console.log('Database initialization complete');
-  } catch (err) {
-    console.error('Failed to initialize database:', err);
-    process.exit(1);
-  }
+  (async () => {
+    pool = getPool();
+    try {
+      console.log('Initializing database...');
+      await initializeDatabase();
+      console.log('Database initialization complete');
+    } catch (err) {
+      console.error('Failed to initialize database:', err.message);
+      console.warn('Continuing startup - database migrations may not be set up');
+      if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+      }
+    }
+  })();
 
   server = app.listen(PORT, () => {
     console.log(`Todo app running on http://localhost:${PORT}`);

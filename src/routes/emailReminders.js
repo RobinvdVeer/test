@@ -121,8 +121,19 @@ function registerRoutes(app) {
     });
   });
 
-  // Manual trigger for sending emails (all users)
+  // Manual trigger for sending emails (admin only)
   router.post('/send-all', async (req, res) => {
+    // Check if user has admin role
+    // Users must have the 'admin' role claim from Keycloak
+    const userRoles = req.user.roles || [];
+    const isAdmin = userRoles.includes('admin');
+
+    if (!isAdmin) {
+      return res.status(403).json({
+        error: 'Admin access required to trigger mass email reminders',
+      });
+    }
+
     const { frontendUrl, smtpHost, smtpPort, smtpUser, smtpPass, fromEmail } = req.app.get('emailConfig');
 
     if (!frontendUrl || !smtpHost) {

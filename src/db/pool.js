@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 const { getConfig } = require('../config');
+const { initializeMigrationsTable } = require('./migrations.js');
 
 let pool;
 
@@ -41,4 +42,5 @@ async function initializeDatabase() {
 module.exports = {
   getPool,
   closePool,
+  initializeDatabase,
 };

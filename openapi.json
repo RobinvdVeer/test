@@ -336,7 +336,7 @@
     },
     "/email-reminders/send-all": {
       "post": {
-        "summary": "Send reminder emails to all users (admin only)",
+        "summary": "Send reminder emails to all users (requires admin role)",
         "security": [
           {
             "bearerAuth": []

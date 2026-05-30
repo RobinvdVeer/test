@@ -63,15 +63,29 @@ async function start() {
       });
     });
 
-    // Manual trigger endpoint - not exposed to public
-    app.post('/trigger', async (req, res) => {
-      try {
-        await emailReminderService.triggerNow(emailConfig);
-        res.json({ success: true, message: 'Emails sent successfully' });
-      } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-      }
-    });
+    // Manual trigger endpoint - requires admin trigger token
+    const ADMIN_TRIGGER_TOKEN = process.env.ADMIN_TRIGGER_TOKEN;
+    if (ADMIN_TRIGGER_TOKEN) {
+      app.post('/trigger', async (req, res) => {
+        const token = req.headers['authorization'];
+        if (!token || token !== `Bearer ${ADMIN_TRIGGER_TOKEN}`) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+        try {
+          await emailReminderService.triggerNow(emailConfig);
+          res.json({ success: true, message: 'Emails sent successfully' });
+        } catch (err) {
+          res.status(500).json({ success: false, error: err.message });
+        }
+      });
+    } else {
+      // No token configured - this endpoint is inaccessible in production
+      app.post('/trigger', (req, res) => {
+        const msg = 'ADMIN_TRIGGER_TOKEN not configured in environment';
+        console.warn(msg + '. To enable manual triggering, set ADMIN_TRIGGER_TOKEN.\n');
+        res.status(403).json({ error: msg });
+      });
+    }
 
     server = app.listen(PORT, () => {
       console.log(`\n✓ Email Reminder Worker running on http://localhost:${PORT}`);

@@ -7,7 +7,7 @@ const { authMiddleware } = require('./middleware/user');
 const { ensureUserMiddleware } = require('./middleware/ensure-user');
 const { registerMetricsRoutes } = require('./routes/metrics');
 const { registerTodosRoutes } = require('./routes/todos');
-const { registerRoutes as registerEmailReminderRoutes } = require('./routes/emailReminders');
+const registerEmailReminderRoutes = require('./routes/emailReminders').registerRoutes;
 
 function createApp() {
   const app = express();

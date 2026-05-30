@@ -95,11 +95,8 @@ todo:
   defaultFrequencyHours: 24
 
 smtp:
-  createSecrets: false
   host: smtp.example.com
   port: 465
-  user: your-email@example.com
-  pass: your-password
   secure: true
   fromEmail: no-reply@example.com
   emailCheckInterval: 3600000  # 1 hour
