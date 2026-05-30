@@ -25,9 +25,6 @@ CREATE TABLE IF NOT EXISTS email_reminder_status (
   UNIQUE(user_id)
 );
 
--- Add index for user lookups
-CREATE INDEX IF NOT EXISTS idx_email_reminders_user_id ON email_reminders_config(user_id);
-
 COMMIT;
 
 -- Rollback (if needed)

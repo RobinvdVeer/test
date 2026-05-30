@@ -86,16 +86,13 @@ async function getMaxFrequency(userId) {
 /**
  * Check if enough time has passed since last email
  */
-async function canSendEmail(userId) {
-  const lastSent = await getLastEmailSent(userId);
-  const maxFrequency = await getMaxFrequency(userId);
-
-  if (!lastSent) {
+async function canSendEmail(userId, lastEmailSent, frequencyMillis) {
+  if (!lastEmailSent) {
     return true;
   }
 
-  const timeSinceLastEmail = Date.now() - new Date(lastSent).getTime();
-  return timeSinceLastEmail >= maxFrequency;
+  const timeSinceLastEmail = Date.now() - new Date(lastEmailSent).getTime();
+  return timeSinceLastEmail >= frequencyMillis;
 }
 
 /**
@@ -104,41 +101,94 @@ async function canSendEmail(userId) {
 async function sendDueEmails(config) {
   const transporter = createTransporter(config);
 
-  // Get all users who have due todos
-  const dueTodosQuery = `
-    SELECT DISTINCT user_id
-    FROM todos
-    WHERE due_date IS NOT NULL
-      AND due_date <= now() + interval '${TODO_DUE_SOON_DAYS} days'
-      AND status != 'completed'
+  // Batch query to fetch all users with due todos, config, and status in one query
+  const batchQuery = `
+    SELECT DISTINCT
+      u.user_id,
+      u.email,
+      erc.frequency_millis,
+      ers.last_email_sent,
+      t.id as todo_id,
+      t.title,
+      t.description,
+      t.category,
+      t.status,
+      t.priority,
+      t.due_date
+    FROM users u
+    LEFT JOIN email_reminders_config erc ON u.user_id = erc.user_id
+    LEFT JOIN email_reminder_status ers ON u.user_id = ers.user_id
+    LEFT JOIN todos t ON u.user_id = t.user_id
+    WHERE t.due_date IS NOT NULL
+      AND t.due_date <= now() + interval '${TODO_DUE_SOON_DAYS} days'
+      AND t.status != 'completed'
+    ORDER BY u.user_id, t.due_date
   `;
 
-  const result = await getPool().query(dueTodosQuery);
-  const userIds = result.rows.map(row => row.user_id);
+  const result = await getPool().query(batchQuery);
+  const users = {};
+  const usersNeedingUpdate = [];
+
+  for (const row of result.rows) {
+    if (!users[row.user_id]) {
+      users[row.user_id] = {
+        userId: row.user_id,
+        email: row.email,
+        frequencyMillis: row.frequency_millis || DEFAULT_MAX_FREQUENCY_MILLIS,
+        lastEmailSent: row.last_email_sent,
+        todos: [],
+        canSend: canSendEmail(row.user_id, row.last_email_sent, row.frequency_millis || DEFAULT_MAX_FREQUENCY_MILLIS)
+      };
+    }
+
+    if (row.todo_id) {
+      users[row.user_id].todos.push({
+        id: row.todo_id,
+        title: row.title,
+        description: row.description,
+        category: row.category,
+        status: row.status,
+        priority: row.priority,
+        due_date: row.due_date
+      });
+    }
+  }
 
   let successCount = 0;
   let failureCount = 0;
 
-  for (const userId of userIds) {
+  for (const userId of Object.keys(users)) {
+    const user = users[userId];
+
     try {
-      const canSend = await canSendEmail(userId);
-      if (!canSend) {
+      if (!user.canSend) {
         console.log(`Skipping ${userId}: too soon since last email`);
         continue;
       }
 
-      const todos = await getDueTodos(userId);
-      if (todos.length === 0) {
+      if (user.todos.length === 0) {
         continue;
       }
 
-      await sendUserEmail(transporter, userId, todos);
-      await updateLastEmailSent(userId);
+      await sendUserEmail(transporter, userId, user.todos);
+      usersNeedingUpdate.push(userId);
       successCount++;
     } catch (err) {
       console.error(`Failed to send email for user ${userId}:`, err.message);
       failureCount++;
     }
+  }
+
+  // Batch update last_email_sent for all sent users
+  if (usersNeedingUpdate.length > 0) {
+    const updateQuery = `
+      INSERT INTO email_reminder_status (user_id, last_email_sent)
+      VALUES (${usersNeedingUpdate.map(() => '($1)').join(',')})
+      ON CONFLICT (user_id)
+      DO UPDATE SET last_email_sent = NOW()
+    `;
+
+    await getPool().query(updateQuery, usersNeedingUpdate);
   }
 
   return { successCount, failureCount };

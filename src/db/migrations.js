@@ -21,25 +21,26 @@ async function applyMigrations() {
   for (const file of files) {
     const migrationName = file;
 
-    // Check if this migration has been applied
+    // Check if this migration has been applied using INSERT...ON CONFLICT
     const result = await pool.query(
-      'SELECT 1 FROM schema_migrations WHERE version = $1',
+      `INSERT INTO schema_migrations (version)
+       VALUES ($1)
+       ON CONFLICT (version)
+       DO NOTHING
+       RETURNING version`,
       [migrationName]
     );
 
     if (result.rows.length === 0) {
-      console.log(`Applying migration: ${file}`);
-      const sql = fs.readFileSync(path.join(migrationsPath, file), 'utf8');
-
-      await pool.query(sql);
-      await pool.query(
-        'INSERT INTO schema_migrations (version) VALUES ($1)',
-        [migrationName]
-      );
-      console.log(`Migration ${file} applied successfully`);
-    } else {
       console.log(`Migration ${file} already applied, skipping`);
+      continue;
     }
+
+    console.log(`Applying migration: ${file}`);
+    const sql = fs.readFileSync(path.join(migrationsPath, file), 'utf8');
+
+    await pool.query(sql);
+    console.log(`Migration ${file} applied successfully`);
   }
 }
 
