@@ -82,7 +82,7 @@ describe('helm chart deployability conventions', () => {
     });
     expect(appDeployment.spec.template.spec.containers[0].env).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'KEYCLOAK_ISSUER_URL', value: 'http://localhost:8081/realms/todos' }),
-      expect.objectContaining({ name: 'KEYCLOAK_JWKS_URL' }),
+      expect.objectContaining({ name: 'KEYCLOAK_JWKS_URL', value: expect.stringContaining('/realms/todos/protocol/openid-connect/certs') }),
       expect.objectContaining({ name: 'KEYCLOAK_AUTHORIZE_URL', value: 'http://localhost:8081/realms/todos/protocol/openid-connect/auth' }),
       expect.objectContaining({ name: 'KEYCLOAK_TOKEN_URL', value: 'http://localhost:8081/realms/todos/protocol/openid-connect/token' }),
       expect.objectContaining({ name: 'KEYCLOAK_LOGOUT_URL', value: 'http://localhost:8081/realms/todos/protocol/openid-connect/logout' }),
@@ -106,7 +106,7 @@ describe('helm chart deployability conventions', () => {
       expect.objectContaining({ name: 'KC_DB_USERNAME', value: 'keycloak' }),
       expect.objectContaining({ name: 'KC_DB_PASSWORD', valueFrom: { secretKeyRef: { name: 'metrics-server-keycloak', key: 'postgres-password' } } }),
       expect.objectContaining({ name: 'KC_HOSTNAME', value: 'localhost' }),
-      expect.objectContaining({ name: 'KC_HOSTNAME_PORT', value: '8080' }),
+      expect.objectContaining({ name: 'KC_HOSTNAME_PORT', value: '8081' }),
     ]));
     expect(keycloakDeployment.spec.template.spec.containers[0].volumeMounts).toEqual(expect.arrayContaining([
       expect.objectContaining({ mountPath: '/opt/keycloak/data/import/realm.json', subPath: 'realm.json' }),
@@ -198,6 +198,10 @@ describe('helm chart deployability conventions', () => {
         },
       }),
     ]);
+
+    const keycloakRealm = docs.find((doc) => doc.kind === 'ConfigMap' && doc.metadata.name === 'test-keycloak-realm');
+    expect(keycloakRealm.data['realm.json']).toContain('http://localhost:8080/auth/callback');
+    expect(keycloakRealm.data['realm.json']).toContain('http://localhost:8080');
   });
 
   maybeTest('does not render ExternalSecret resources without staging overrides', () => {
