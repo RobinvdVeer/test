@@ -82,7 +82,7 @@ describe('helm chart deployability conventions', () => {
     });
     expect(appDeployment.spec.template.spec.containers[0].env).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'KEYCLOAK_ISSUER_URL', value: 'http://localhost:8081/realms/todos' }),
-      expect.objectContaining({ name: 'KEYCLOAK_JWKS_URL', value: expect.stringContaining('/realms/todos/protocol/openid-connect/certs') }),
+      expect.objectContaining({ name: 'KEYCLOAK_JWKS_URL', value: expect.stringMatching(/test-keycloak:8080/) }),
       expect.objectContaining({ name: 'KEYCLOAK_AUTHORIZE_URL', value: 'http://localhost:8081/realms/todos/protocol/openid-connect/auth' }),
       expect.objectContaining({ name: 'KEYCLOAK_TOKEN_URL', value: 'http://localhost:8081/realms/todos/protocol/openid-connect/token' }),
       expect.objectContaining({ name: 'KEYCLOAK_LOGOUT_URL', value: 'http://localhost:8081/realms/todos/protocol/openid-connect/logout' }),
@@ -123,6 +123,18 @@ describe('helm chart deployability conventions', () => {
     expect(postgresInit.data['init.sql']).toContain('CREATE TABLE IF NOT EXISTS users');
     expect(postgresInit.data['init.sql']).toContain('CREATE TABLE IF NOT EXISTS todos');
     expect(postgresInit.data['init.sql']).toContain('CREATE INDEX IF NOT EXISTS idx_todos_user_id');
+
+    // Ensure JWKS_URL uses internal Kubernetes service DNS (not public localhost URL)
+    const jwksEnv = appDeployment.spec.template.spec.containers[0].env.find(
+      (e) => e.name === 'KEYCLOAK_JWKS_URL'
+    );
+    expect(jwksEnv.value).not.toContain('localhost');
+    expect(jwksEnv.value).toContain('test-keycloak');
+    expect(jwksEnv.value).toContain('8080');
+    const issuerEnv = appDeployment.spec.template.spec.containers[0].env.find(
+      (e) => e.name === 'KEYCLOAK_ISSUER_URL'
+    );
+    expect(issuerEnv.value).toContain('localhost:8081');
   });
 
   maybeTest('renders ExternalSecret resources when enabled (staging)', () => {
@@ -202,6 +214,20 @@ describe('helm chart deployability conventions', () => {
     const keycloakRealm = docs.find((doc) => doc.kind === 'ConfigMap' && doc.metadata.name === 'test-keycloak-realm');
     expect(keycloakRealm.data['realm.json']).toContain('http://localhost:8080/auth/callback');
     expect(keycloakRealm.data['realm.json']).toContain('http://localhost:8080');
+
+    // Verify app auth env vars with staging values
+    const stagingDocs = yaml.loadAll(rendered).filter(Boolean);
+    const stagingAppDeployment = stagingDocs.find((doc) => doc.kind === 'Deployment' && doc.metadata.name === 'test-app');
+    const stagingJwksEnv = stagingAppDeployment.spec.template.spec.containers[0].env.find(
+      (e) => e.name === 'KEYCLOAK_JWKS_URL'
+    );
+    const stagingIssuerEnv = stagingAppDeployment.spec.template.spec.containers[0].env.find(
+      (e) => e.name === 'KEYCLOAK_ISSUER_URL'
+    );
+    expect(stagingJwksEnv.value).not.toContain('localhost');
+    expect(stagingJwksEnv.value).toContain('test-keycloak');
+    expect(stagingJwksEnv.value).toContain('8080');
+    expect(stagingIssuerEnv.value).toContain('localhost:8081');
   });
 
   maybeTest('does not render ExternalSecret resources without staging overrides', () => {
