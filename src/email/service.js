@@ -20,9 +20,10 @@ function buildTransport(config) {
 }
 
 function buildEmailBody(todos, dueSoonThresholdDays) {
+  const threshold = Number(dueSoonThresholdDays) || 2;
   const lines = [
     '<h2>Upcoming Todo Reminders</h2>',
-    `<p>You have <strong>${todos.length}</strong> todo(s) with a due date within ${dueSoonThresholdDays} day(s):</p>`,
+    `<p>You have <strong>${todos.length}</strong> todo(s) with a due date within ${threshold} day(s):</p>`,
     '<ul>',
   ];
 
@@ -61,6 +62,11 @@ async function sendTodoReminder({ to, todos, dueSoonThresholdDays }) {
     return false;
   }
 
+  // Validate recipient email to prevent SMTP header injection
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    return false;
+  }
+
   const config = {
     smtpHost: process.env.SMTP_HOST || null,
     smtpPort: process.env.SMTP_PORT
@@ -71,6 +77,12 @@ async function sendTodoReminder({ to, todos, dueSoonThresholdDays }) {
     smtpPass: process.env.SMTP_PASS || null,
     smtpFrom: process.env.SMTP_FROM || 'noreply@localhost',
   };
+
+  // Validate smtpFrom to prevent SMTP header injection or sender impersonation
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(config.smtpFrom)) {
+    console.warn('[email] Invalid SMTP_FROM configured, skipping send');
+    return false;
+  }
 
   const transport = buildTransport(config);
   if (!transport) {
