@@ -22,6 +22,9 @@ helm upgrade --install metrics-server ./deploy/chart \
   --set image.app.tag=<tag>
 ```
 
+### Local port-forward development
+For local development with port-forwarded staging services, see [DEPLOYMENT.md#local-development-via-kubernetes-port-forward](../DEPLOYMENT.md#local-development-via-kubernetes-port-forward). Use `values-local.yaml` instead.
+
 ## Non-ESO environments
 
 For local/non-ESO environments, disable `externalSecrets.enabled` and either:
@@ -54,3 +57,5 @@ helm upgrade --install metrics-server ./deploy/chart \
 ```
 
 Alternatively, set `app.database.secretName` and `postgres.auth.passwordSecretName` to match your pre-created secrets.
+
+**Note:** For local port-forward development (connecting a local app to staging Keycloak), use `values-local.yaml` instead of `values-staging.yaml`. See [DEPLOYMENT.md#local-development-via-kubernetes-port-forward](../DEPLOYMENT.md#local-development-via-kubernetes-port-forward).

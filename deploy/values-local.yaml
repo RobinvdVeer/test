@@ -1,3 +1,8 @@
+# ⚠️ LOCAL PORT-FORWARD DEVELOPMENT CONFIG
+# Do NOT use this file for real staging deployment.
+# This file is only for local development using
+# `kubectl port-forward` to the staging namespace.
+# For real staging, use `values-staging.yaml` instead.
 image:
   app:
     repository: ghcr.io/robinvdveer/metrics-server

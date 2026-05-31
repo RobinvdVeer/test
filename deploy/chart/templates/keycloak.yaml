@@ -60,7 +60,7 @@ spec:
             - name: KC_HOSTNAME
               value: {{ .Values.keycloak.hostname | quote }}
             - name: KC_HOSTNAME_PORT
-              value: {{ .Values.service.keycloak.port | quote }}
+              value: {{ .Values.keycloak.hostnamePort | quote }}
             - name: KC_HOSTNAME_STRICT
               value: "false"
           volumeMounts:
