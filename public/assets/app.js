@@ -7,6 +7,7 @@ const form = document.getElementById('todo-form');
 const logoutButton = document.getElementById('logout');
 const btnAdd = document.getElementById('btn-add');
 const btnCancel = document.getElementById('btn-cancel');
+const searchInput = document.getElementById('search');
 
 // ── HTML escaping ───────────────────────────────────────────────
 function escapeHtml(value) {
@@ -35,7 +36,7 @@ function hideStatus() {
 function showForm() {
   form.classList.add('visible');
   form.reset();
-  form.querySelector('#title').focus();
+  form.elements['title'].focus();
 }
 
 function hideForm() {
@@ -43,29 +44,69 @@ function hideForm() {
   form.reset();
 }
 
-// ── Loading indicator helper ────────────────────────────────────
-function toggleLoading(element, isLoading) {
-  if (!element) return;
-  if (isLoading) {
-    element.dataset.loading = 'true';
-    element.style.opacity = '0.5';
-    element.style.pointerEvents = 'none';
-  } else {
-    delete element.dataset.loading;
-    element.style.opacity = '';
-    element.style.pointerEvents = '';
-  }
-}
-
 // ── Badge label formatter ───────────────────────────────────────
-function statusLabel(status) {
-  if (!status) return '';
-  return status.replace(/_/g, ' ');
+function formatLabel(value) {
+  if (!value) return '';
+  return value.replace(/_/g, ' ');
 }
 
-function priorityLabel(priority) {
-  if (!priority) return '';
-  return priority.replace(/_/g, ' ');
+// ── Badge rendering ───────────────────────────────────────────────
+function renderBadges(todo) {
+  const badges = [];
+
+  if (todo.status) {
+    const badge = document.createElement('span');
+    const statusClass = todo.status === 'completed' ? 'completed' : todo.status === 'in_progress' ? 'in_progress' : 'pending';
+    badge.className = 'badge badge--' + statusClass;
+    badge.textContent = formatLabel(todo.status);
+    badges.push(badge);
+  }
+
+  if (todo.priority) {
+    const badge = document.createElement('span');
+    badge.className = 'badge badge--priority-' + todo.priority.replace(/_/g, '-');
+    badge.textContent = formatLabel(todo.priority);
+    badges.push(badge);
+  }
+
+  if (todo.category) {
+    const badge = document.createElement('span');
+    badge.className = 'badge badge--category';
+    badge.textContent = todo.category;
+    badges.push(badge);
+  }
+
+  return badges;
+}
+
+// ── Title sub-routine ─────────────────────────────────────────────
+function renderTitle(todo) {
+  const titleEl = document.createElement('div');
+  titleEl.className = 'todo-title';
+  titleEl.textContent = todo.title;
+  return titleEl;
+}
+
+// ── Meta (badges) sub-routine ─────────────────────────────────────
+function renderMeta(todo) {
+  const badges = renderBadges(todo);
+  if (!badges.length) return null;
+
+  const metaEl = document.createElement('div');
+  metaEl.className = 'todo-meta';
+  for (const b of badges) {
+    metaEl.appendChild(b);
+  }
+  return metaEl;
+}
+
+// ── Description sub-routine ───────────────────────────────────────
+function renderDescription(todo) {
+  if (!todo.description) return null;
+  const descEl = document.createElement('div');
+  descEl.className = 'todo-description';
+  descEl.textContent = todo.description;
+  return descEl;
 }
 
 // ── Todo item renderer ──────────────────────────────────────────
@@ -83,53 +124,15 @@ function renderTodoItem(todo) {
   }
 
   const parts = [];
+  parts.push(renderTitle(todo));
 
-  // Title
-  const titleEl = document.createElement('div');
-  titleEl.className = 'todo-title';
-  titleEl.textContent = todo.title;
-  parts.push(titleEl);
-
-  // Meta row with badges
-  const metaEl = document.createElement('div');
-  metaEl.className = 'todo-meta';
-
-  const badges = [];
-
-  if (todo.status) {
-    const badge = document.createElement('span');
-    badge.className = 'badge badge--' + (todo.status === 'completed' ? 'completed' : todo.status === 'in_progress' ? 'in_progress' : 'pending');
-    badge.textContent = statusLabel(todo.status);
-    badges.push(badge);
-  }
-
-  if (todo.priority) {
-    const badge = document.createElement('span');
-    badge.className = 'badge badge--priority-' + todo.priority.replace(/_/g, '-');
-    badge.textContent = priorityLabel(todo.priority);
-    badges.push(badge);
-  }
-
-  if (todo.category) {
-    const badge = document.createElement('span');
-    badge.className = 'badge badge--category';
-    badge.textContent = todo.category;
-    badges.push(badge);
-  }
-
-  for (const b of badges) {
-    metaEl.appendChild(b);
-  }
-
-  if (badges.length) {
+  const metaEl = renderMeta(todo);
+  if (metaEl) {
     parts.push(metaEl);
   }
 
-  // Description (optional)
-  if (todo.description) {
-    const descEl = document.createElement('div');
-    descEl.className = 'todo-description';
-    descEl.textContent = todo.description;
+  const descEl = renderDescription(todo);
+  if (descEl) {
     parts.push(descEl);
   }
 
@@ -149,15 +152,35 @@ function renderEmptyState() {
   todosList.appendChild(li);
 }
 
-// ── Full list renderer ──────────────────────────────────────────
+// ── Filtered list renderer ───────────────────────────────────────
+const allTodos = [];
+
 function renderTodos(todos) {
+  allTodos.length = 0;
+  for (const t of todos) {
+    allTodos.push(t);
+  }
+  applyFilter();
+}
+
+function applyFilter() {
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
   todosList.innerHTML = '';
-  if (!todos.length) {
+
+  const filtered = query
+    ? allTodos.filter((t) =>
+        [t.title, t.description, t.category, t.status, t.priority]
+          .filter(Boolean)
+          .some((v) => v.toLowerCase().includes(query))
+      )
+    : allTodos;
+
+  if (!filtered.length) {
     renderEmptyState();
     return;
   }
 
-  for (const todo of todos) {
+  for (const todo of filtered) {
     todosList.appendChild(renderTodoItem(todo));
   }
 }
@@ -229,6 +252,12 @@ logoutButton.addEventListener('click', () => {
 
 btnAdd.addEventListener('click', showForm);
 btnCancel.addEventListener('click', hideForm);
+
+if (searchInput) {
+  searchInput.addEventListener('input', () => {
+    applyFilter();
+  });
+}
 
 // ── Boot ────────────────────────────────────────────────────────
 (async () => {
