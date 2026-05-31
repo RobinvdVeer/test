@@ -85,6 +85,23 @@ helm upgrade --install metrics-server ./deploy/chart \
   --set-string secrets.keycloakAdminPassword="$KEYCLOAK_ADMIN_PASSWORD"
 ```
 
+### Local Development via Kubernetes Port-Forward
+
+If you want to connect the app (running locally) to a staging Keycloak instance:
+
+```bash
+# Port-forward both services from your staging namespace
+kubectl -n test-staging port-forward svc/app-staging-app 8080:80 &
+kubectl -n test-staging port-forward svc/app-staging-keycloak 8081:8080
+```
+
+Then deploy the chart with the local port-forward values:
+```bash
+helm upgrade --install metrics-server-local ./deploy/chart \
+  -f ./deploy/values-local.yaml \
+  --set image.app.tag=<tag>
+```
+
 See [deploy/README.md](./deploy/README.md) and [deploy/chart](./deploy/chart) for the chart values and secret options.
 
 #### 2. Database Scaling
@@ -285,7 +302,7 @@ For thousands of concurrent users:
 
 ## Environment Variables
 
-### Development
+### Docker Compose
 ```
 PORT=3000
 POSTGRES_USER=todouser
@@ -304,6 +321,12 @@ AUTH_POST_LOGOUT_REDIRECT_URI=http://localhost:3000/login
 DATABASE_URL=postgresql://todouser:change-me@localhost:5432/tododb
 NODE_ENV=development
 ```
+
+### Helm chart (via `values-staging.yaml`)
+The Helm chart derives these values from `values.yaml` and environment-overrides:
+- `KEYCLOAK_ISSUER_URL` / `AUTHORIZE_URL` / `TOKEN_URL` / `LOGOUT_URL` come from `app.auth.*`
+- `KEYCLOAK_JWKS_URL` is derived from `keycloak.publicUrl` in the chart template
+- `redirectUri` / `postLogoutRedirectUri` come from `app.auth.*`
 
 ### Production
 ```
