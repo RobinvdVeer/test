@@ -66,11 +66,21 @@ async function shouldSendReminder(userId) {
   const intervalParam = `${reminder.minIntervalMinutes} minutes`;
 
   const result = await getPool().query(
-    'SELECT 1 FROM users WHERE user_id = $1 AND (last_reminder_sent IS NULL OR last_reminder_sent < NOW() - INTERVAL $2)',
-    [userId, intervalParam]
+    `SELECT NOW() - last_reminder_sent > interval '${intervalParam}' AS eligible
+     FROM users
+     WHERE user_id = $1`,
+    [userId]
   );
 
-  return result.rows.length > 0;
+  const row = result.rows[0];
+
+  // If the user has no last_reminder_sent yet, they are eligible.
+  if (!row || !row.last_reminder_sent) {
+    return true;
+  }
+
+  // Use DB-side interval comparison to avoid client/server clock skew.
+  return row.eligible;
 }
 
 /**

@@ -39,7 +39,8 @@
           },
           "created_at": { "type": "string", "format": "date-time" },
           "updated_at": { "type": "string", "format": "date-time" },
-          "last_viewed": { "type": "string", "format": "date-time" }
+          "last_viewed": { "type": "string", "format": "date-time" },
+          "due_date": { "type": "string", "format": "date-time", "nullable": true }
         }
       },
       "TodoInput": {
@@ -55,7 +56,8 @@
           "priority": {
             "type": "string",
             "enum": ["low", "medium", "high"]
-          }
+          },
+          "due_date": { "type": "string", "format": "date-time", "nullable": true }
         }
       },
       "Error": {
