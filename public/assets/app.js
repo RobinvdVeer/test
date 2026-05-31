@@ -20,6 +20,15 @@ const toast = document.getElementById('toast');
 let allTodos = [];
 let deleteTargetId = null;
 
+// ===== Debounce utility (finding 2) =====
+function debounce(fn, delay = 150) {
+  let timer;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
 // ===== Auth Helpers =====
 function getAuthHeaders() {
   const auth = getStoredAuth();
@@ -242,17 +251,7 @@ function renderTodos(todos) {
       </div>
     `;
 
-    // Checkbox → toggle status (chunk 4)
-    const checkbox = li.querySelector('.todo-checkbox');
-    checkbox.addEventListener('change', () => {
-      updateTodo(todo.id, { status: checkbox.checked ? 'completed' : 'pending' });
-    });
-
-    // Edit button (chunk 4)
-    li.querySelector('.edit-btn').addEventListener('click', () => openEditModal(todo));
-
-    // Delete button (chunk 4)
-    li.querySelector('.delete-btn').addEventListener('click', () => openDeleteConfirm(todo.id));
+    // Event delegation handles checkbox, edit, and delete actions
 
     list.appendChild(li);
   }
@@ -300,7 +299,10 @@ async function createTodo(event) {
   showToast('Todo created');
   form.reset();
   document.getElementById('priority').value = 'medium';
-  await loadTodos();
+  const newTodo = await response.json();
+  allTodos.push(newTodo);
+  renderSummary(allTodos);
+  renderTodos(allTodos);
 }
 
 async function updateTodo(id, updates) {
@@ -312,15 +314,15 @@ async function updateTodo(id, updates) {
 
   if (response.status === 404) {
     showToast('Todo not found', 'error');
-    return false;
+    return null;
   }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     showToast(data.error || 'Failed to update todo', 'error');
-    return false;
+    return null;
   }
 
-  return true;
+  return await response.json();
 }
 
 async function deleteTodo(id) {
@@ -339,7 +341,6 @@ async function deleteTodo(id) {
     return false;
   }
 
-  showToast('Todo deleted');
   return true;
 }
 
@@ -373,11 +374,16 @@ async function handleEditSubmit(event) {
     priority: document.getElementById('edit-priority').value || undefined,
   };
 
-  const ok = await updateTodo(id, updates);
-  if (ok) {
+  const updatedTodo = await updateTodo(id, updates);
+  if (updatedTodo) {
+    const idx = allTodos.findIndex(t => String(t.id) === String(id));
+    if (idx !== -1) {
+      allTodos[idx] = updatedTodo;
+    }
     showToast('Todo updated');
     closeEditModal();
-    await loadTodos();
+    renderSummary(allTodos);
+    renderTodos(allTodos);
   }
 }
 
@@ -396,8 +402,11 @@ async function handleDeleteConfirm() {
   if (!deleteTargetId) return;
   const ok = await deleteTodo(deleteTargetId);
   if (ok) {
+    allTodos = allTodos.filter(t => String(t.id) !== String(deleteTargetId));
     closeDeleteConfirm();
-    await loadTodos();
+    showToast('Todo deleted');
+    renderSummary(allTodos);
+    renderTodos(allTodos);
   }
 }
 
@@ -410,10 +419,10 @@ logoutButton.addEventListener('click', () => {
 });
 
 // Chunk 3: reactive filters
-searchInput.addEventListener('input', () => renderTodos(allTodos));
+searchInput.addEventListener('input', debounce(() => renderTodos(allTodos), 150));
 filterStatus.addEventListener('change', () => renderTodos(allTodos));
 filterPriority.addEventListener('change', () => renderTodos(allTodos));
-filterCategory.addEventListener('input', () => renderTodos(allTodos));
+filterCategory.addEventListener('input', debounce(() => renderTodos(allTodos), 150));
 sortBySelect.addEventListener('change', () => renderTodos(allTodos));
 
 // Chunk 4: edit modal
@@ -428,6 +437,31 @@ document.getElementById('confirm-cancel').addEventListener('click', closeDeleteC
 document.getElementById('confirm-delete').addEventListener('click', handleDeleteConfirm);
 confirmDialog.addEventListener('click', (e) => {
   if (e.target === confirmDialog) closeDeleteConfirm();
+});
+
+// Event delegation for todo items (finding 1)
+todosList.addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.edit-btn');
+  if (editBtn) {
+    const item = editBtn.closest('.todo-item');
+    const todo = allTodos.find(t => String(t.id) === String(item.dataset.id));
+    if (todo) openEditModal(todo);
+    return;
+  }
+  const deleteBtn = e.target.closest('.delete-btn');
+  if (deleteBtn) {
+    const item = deleteBtn.closest('.todo-item');
+    openDeleteConfirm(item.dataset.id);
+    return;
+  }
+});
+
+todosList.addEventListener('change', (e) => {
+  const checkbox = e.target.closest('.todo-checkbox');
+  if (checkbox) {
+    const item = checkbox.closest('.todo-item');
+    updateTodo(item.dataset.id, { status: checkbox.checked ? 'completed' : 'pending' });
+  }
 });
 
 // ===== Init =====
