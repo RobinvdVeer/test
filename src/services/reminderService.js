@@ -18,8 +18,7 @@ async function getDueSoonTodos() {
      FROM todos
      WHERE due_date IS NOT NULL
        AND status != 'completed'
-       AND due_date BETWEEN NOW() AND NOW() + INTERVAL $1`,
-    [intervalParam]
+       AND due_date BETWEEN NOW() AND NOW() + INTERVAL '${intervalParam}'`
   );
 
   const todosByUser = new Map();

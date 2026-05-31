@@ -36,3 +36,9 @@ CREATE INDEX IF NOT EXISTS idx_todos_user_status_created_at ON todos(user_id, st
 CREATE INDEX IF NOT EXISTS idx_todos_user_status_updated_at ON todos(user_id, status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_created_at ON todos(user_id, category, created_at);
 CREATE INDEX IF NOT EXISTS idx_todos_user_category_updated_at ON todos(user_id, category, updated_at);
+
+-- Ensure todos has due_date column (in case init-db.sql ran before the column existed)
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS due_date TIMESTAMP;
+
+-- Ensure users has last_reminder_sent column (in case init-db.sql ran before the column existed)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_reminder_sent TIMESTAMP;
