@@ -35,7 +35,14 @@ function hideStatus() {
 function showForm() {
   form.classList.add('visible');
   form.reset();
-  form.querySelector('#title').focus();
+  try {
+    const titleInput = form.querySelector('#title');
+    if (titleInput) {
+      titleInput.focus();
+    }
+  } catch (_) {
+    // title input may not exist — safe to ignore
+  }
 }
 
 function hideForm() {
@@ -216,10 +223,16 @@ async function createTodo(event) {
 }
 
 // ── Event listeners ─────────────────────────────────────────────
-form.addEventListener('submit', (event) => {
-  createTodo(event).catch((err) => {
+form.addEventListener('submit', async (event) => {
+  toggleLoading(form, true);
+  try {
+    await createTodo(event);
+    hideStatus();
+  } catch (err) {
     showStatus(err.message || 'Failed to create todo', 'error');
-  });
+  } finally {
+    toggleLoading(form, false);
+  }
 });
 
 logoutButton.addEventListener('click', () => {
