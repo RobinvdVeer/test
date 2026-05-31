@@ -36,6 +36,7 @@ async function getDueSoonTodos() {
 
 /**
  * Check whether enough time has elapsed since the user's last reminder.
+ * Server-side SQL comparison to stay consistent with the rest of the codebase.
  *
  * @param {string} userId
  * @returns {Promise<boolean>} true if we should send a reminder now
@@ -45,22 +46,11 @@ async function shouldSendReminder(userId) {
   const intervalParam = `${reminder.minIntervalMinutes} minutes`;
 
   const result = await getPool().query(
-    'SELECT last_reminder_sent FROM users WHERE user_id = $1',
-    [userId]
+    'SELECT 1 FROM users WHERE user_id = $1 AND (last_reminder_sent IS NULL OR last_reminder_sent < NOW() - INTERVAL $2)',
+    [userId, intervalParam]
   );
 
-  const row = result.rows[0];
-
-  // If the user has no last_reminder_sent yet, they are eligible.
-  if (!row || !row.last_reminder_sent) {
-    return true;
-  }
-
-  // Compare the last-sent timestamp to NOW() minus the minimum interval.
-  const lastSent = new Date(row.last_reminder_sent);
-  const nowMinusInterval = new Date(Date.now() - reminder.minIntervalMinutes * 60 * 1000);
-
-  return lastSent < nowMinusInterval;
+  return result.rows.length > 0;
 }
 
 /**
@@ -92,10 +82,13 @@ async function sendReminders() {
   const todosByUser = await getDueSoonTodos();
 
   for (const [userId, todos] of todosByUser) {
-    // Skip if the user doesn't have an email on record.
+    // Single query for both email and cooldown check.
+    const { reminder } = getConfig();
+    const intervalParam = `${reminder.minIntervalMinutes} minutes`;
+
     const userResult = await getPool().query(
-      'SELECT email FROM users WHERE user_id = $1',
-      [userId]
+      'SELECT email FROM users WHERE user_id = $1 AND (last_reminder_sent IS NULL OR last_reminder_sent < NOW() - INTERVAL $2)',
+      [userId, intervalParam]
     );
 
     const user = userResult.rows[0];
@@ -103,14 +96,8 @@ async function sendReminders() {
       continue;
     }
 
-    // Respect the per-user cooldown.
-    const eligible = await shouldSendReminder(userId);
-    if (!eligible) {
-      continue;
-    }
-
     // Send the reminder email.
-    const emailResult = await sendReminderEmail({ to: user.email, todos });
+    const emailResult = await sendReminderEmail({ to: user.email, todos, dueSoonHours: reminder.dueSoonHours });
 
     if (emailResult.success) {
       await markReminderSent(userId);

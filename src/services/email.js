@@ -44,11 +44,12 @@ function escapeHtml(str) {
  * @returns {Promise<{success: boolean, info?: object, error?: string}>}
  */
 async function sendEmail({ to, subject, text, html }) {
+  const { email } = getConfig();
   const t = getTransporter();
 
   try {
     const info = await t.sendMail({
-      from: `"Todo App" <${getConfig().email.from}>`,
+      from: `"Todo App" <${email.from}>`,
       to,
       subject,
       text,
@@ -69,8 +70,9 @@ async function sendEmail({ to, subject, text, html }) {
  * @param {Array}  opts.todos    – array of todo objects (each with title, category, due_date)
  * @returns {Promise<{success: boolean, info?: object, error?: string}>}
  */
-async function sendReminderEmail({ to, todos }) {
+async function sendReminderEmail({ to, todos, dueSoonHours }) {
   const subject = 'Upcoming Todos – Action Required';
+  const windowHours = dueSoonHours || getConfig().reminder.dueSoonHours;
 
   const lines = todos.map((t) => {
     const date = t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No due date';
@@ -81,7 +83,7 @@ async function sendReminderEmail({ to, todos }) {
   const text = [
     'Hi,',
     '',
-    'The following todos have a due date within the next 48 hours:',
+    `The following todos have a due date within the next ${windowHours} hours:`,
     '',
     lines.join('\n'),
     '',
@@ -92,7 +94,7 @@ async function sendReminderEmail({ to, todos }) {
 
   const html = [
     '<h2>Upcoming Todos</h2>',
-    '<p>The following todos have a due date within the next 48 hours:</p>',
+    `<p>The following todos have a due date within the next ${windowHours} hours:</p>`,
     '<ul>',
     ...todos.map((t) => {
       const date = t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No due date';
