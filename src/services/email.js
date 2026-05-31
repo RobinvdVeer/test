@@ -1,24 +1,37 @@
 const nodemailer = require('nodemailer');
 const { getConfig } = require('../config');
 
-function createTransporter() {
-  const config = getConfig();
-  const { email } = config;
+let transporter;
 
-  const transporter = nodemailer.createTransport({
-    host: email.host,
-    port: email.port,
-    secure: email.secure,
-    auth:
-      email.user && email.pass
-        ? {
-            user: email.user,
-            pass: email.pass,
-          }
-        : undefined,
-  });
+function getTransporter() {
+  if (!transporter) {
+    const config = getConfig();
+    const { email } = config;
+
+    transporter = nodemailer.createTransport({
+      host: email.host,
+      port: email.port,
+      secure: email.secure,
+      auth:
+        email.user && email.pass
+          ? {
+              user: email.user,
+              pass: email.pass,
+            }
+          : undefined,
+    });
+  }
 
   return transporter;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**
@@ -31,10 +44,10 @@ function createTransporter() {
  * @returns {Promise<{success: boolean, info?: object, error?: string}>}
  */
 async function sendEmail({ to, subject, text, html }) {
-  const transporter = createTransporter();
+  const t = getTransporter();
 
   try {
-    const info = await transporter.sendMail({
+    const info = await t.sendMail({
       from: `"Todo App" <${getConfig().email.from}>`,
       to,
       subject,
@@ -83,8 +96,8 @@ async function sendReminderEmail({ to, todos }) {
     '<ul>',
     ...todos.map((t) => {
       const date = t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No due date';
-      const category = t.category ? ` <em>[${t.category}]</em>` : '';
-      return `<li><strong>${t.title}</strong>${category} — Due: ${date}</li>`;
+      const escapedCategory = t.category ? ` <em>[${escapeHtml(t.category)}]</em>` : '';
+      return `<li><strong>${escapeHtml(t.title)}</strong>${escapedCategory} — Due: ${date}</li>`;
     }),
     '</ul>',
     '<p>Please review and complete them before the deadline.</p>',

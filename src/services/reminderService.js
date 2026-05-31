@@ -140,8 +140,7 @@ let reminderIntervalId = null;
  * @returns {NodeJS.Timeout|null} interval ID, or null if email is disabled
  */
 function startReminderScheduler() {
-  const { reminder } = getConfig();
-  const { email } = getConfig();
+  const { reminder, email } = getConfig();
 
   // If the SMTP host is still the default (localhost), warn but don't block startup.
   if (email.host === 'localhost' && !process.env.EMAIL_HOST) {
