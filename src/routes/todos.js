@@ -40,6 +40,18 @@ function isValidNumericId(id) {
   return typeof id === 'string' && /^\d+$/.test(id);
 }
 
+function validateDueDate(value, res) {
+  if (value === undefined || value === null || value === '') return true;
+
+  const d = new Date(value);
+  if (isNaN(d.getTime())) {
+    res.status(400).json({ error: 'Invalid due_date (must be a valid date string)' });
+    return false;
+  }
+
+  return true;
+}
+
 function registerTodosRoutes() {
   const router = express.Router();
 
@@ -65,7 +77,7 @@ function registerTodosRoutes() {
   router.post(
     '/',
     withErrorHandling('Error creating todo:', async (req, res) => {
-      const { title, description, category, status, priority } = req.body;
+      const { title, description, category, status, priority, due_date } = req.body;
 
       if (!title) {
         return res.status(400).json({ error: 'Title is required' });
@@ -73,6 +85,7 @@ function registerTodosRoutes() {
 
       if (!validateEnumOr400(status, VALID_STATUS, 'status', res)) return;
       if (!validateEnumOr400(priority, VALID_PRIORITY, 'priority', res)) return;
+      if (!validateDueDate(due_date, res)) return;
 
       const result = await createTodo(req.userId, {
         title,
@@ -80,6 +93,7 @@ function registerTodosRoutes() {
         category,
         status,
         priority,
+        due_date,
       });
 
       res.status(201).json(result);
@@ -110,7 +124,7 @@ function registerTodosRoutes() {
     '/:id',
     withErrorHandling('Error updating todo:', async (req, res) => {
       const { id } = req.params;
-      const { title, description, category, status, priority } = req.body;
+      const { title, description, category, status, priority, due_date } = req.body;
 
       if (!isValidNumericId(id)) {
         return res.status(400).json({ error: 'Invalid id' });
@@ -118,6 +132,7 @@ function registerTodosRoutes() {
 
       if (!validateEnumOr400(status, VALID_STATUS, 'status', res)) return;
       if (!validateEnumOr400(priority, VALID_PRIORITY, 'priority', res)) return;
+      if (!validateDueDate(due_date, res)) return;
 
       const result = await updateTodo(req.userId, id, {
         title,
@@ -125,6 +140,7 @@ function registerTodosRoutes() {
         category,
         status,
         priority,
+        due_date,
       });
 
       if (result && result.type === 'NO_FIELDS_TO_UPDATE') {
