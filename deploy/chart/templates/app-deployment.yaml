@@ -48,7 +48,7 @@ spec:
             - name: KEYCLOAK_ISSUER_URL
               value: {{ .Values.app.auth.issuerUrl | quote }}
             - name: KEYCLOAK_JWKS_URL
-              value: {{ printf "%s/realms/%s/protocol/openid-connect/certs" .Values.keycloak.publicUrl .Values.keycloak.realm | quote }}
+              value: {{ printf "http://%s-keycloak:%d/realms/%s/protocol/openid-connect/certs" .Release.Name (int .Values.service.keycloak.port) .Values.keycloak.realm | quote }}
             - name: KEYCLOAK_AUTHORIZE_URL
               value: {{ .Values.app.auth.authorizeUrl | quote }}
             - name: KEYCLOAK_TOKEN_URL
