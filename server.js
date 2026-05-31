@@ -1,7 +1,7 @@
 const { createApp } = require('./src/app');
 const { getConfig } = require('./src/config');
 const { getPool, closePool } = require('./src/db/pool');
-const { stopReminderScheduler } = require('./src/services/reminderService');
+const { startReminderScheduler, stopReminderScheduler } = require('./src/services/reminderService');
 
 const { PORT } = getConfig();
 
@@ -25,6 +25,9 @@ if (require.main === module) {
     console.log(`OpenAPI at http://localhost:${PORT}/openapi.json`);
     console.log(`Todos require a Bearer JWT from Keycloak`);
   });
+
+  // Start the reminder scheduler (non-blocking) after the server is listening.
+  startReminderScheduler();
 
   process.on('SIGTERM', () => {
     console.log('SIGTERM signal received: closing HTTP server');

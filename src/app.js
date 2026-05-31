@@ -7,7 +7,6 @@ const { authMiddleware } = require('./middleware/user');
 const { ensureUserMiddleware } = require('./middleware/ensure-user');
 const { registerMetricsRoutes } = require('./routes/metrics');
 const { registerTodosRoutes } = require('./routes/todos');
-const { startReminderScheduler } = require('./services/reminderService');
 
 function createApp() {
   const app = express();
@@ -58,9 +57,6 @@ function createApp() {
   registerMetricsRoutes(app, startTime);
 
   app.use('/todos', authMiddleware, ensureUserMiddleware, registerTodosRoutes());
-
-  // Start the reminder scheduler (non-blocking).
-  startReminderScheduler();
 
   return app;
 }
