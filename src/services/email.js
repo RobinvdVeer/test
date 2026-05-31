@@ -1,22 +1,26 @@
 const nodemailer = require('nodemailer');
 const { getConfig } = require('../config');
 
-function createTransporter() {
-  const config = getConfig();
-  const { email } = config;
+let transporter;
 
-  const transporter = nodemailer.createTransport({
-    host: email.host,
-    port: email.port,
-    secure: email.secure,
-    auth:
-      email.user && email.pass
-        ? {
-            user: email.user,
-            pass: email.pass,
-          }
-        : undefined,
-  });
+function getTransporter() {
+  if (!transporter) {
+    const config = getConfig();
+    const { email } = config;
+
+    transporter = nodemailer.createTransport({
+      host: email.host,
+      port: email.port,
+      secure: email.secure,
+      auth:
+        email.user && email.pass
+          ? {
+              user: email.user,
+              pass: email.pass,
+            }
+          : undefined,
+    });
+  }
 
   return transporter;
 }
@@ -31,10 +35,10 @@ function createTransporter() {
  * @returns {Promise<{success: boolean, info?: object, error?: string}>}
  */
 async function sendEmail({ to, subject, text, html }) {
-  const transporter = createTransporter();
+  const t = getTransporter();
 
   try {
-    const info = await transporter.sendMail({
+    const info = await t.sendMail({
       from: `"Todo App" <${getConfig().email.from}>`,
       to,
       subject,
