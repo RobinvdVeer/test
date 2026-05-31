@@ -5,6 +5,8 @@ const statusEl = document.getElementById('status');
 const todosList = document.getElementById('todos');
 const form = document.getElementById('todo-form');
 const logoutButton = document.getElementById('logout');
+const btnAdd = document.getElementById('btn-add');
+const btnCancel = document.getElementById('btn-cancel');
 
 // ── HTML escaping ───────────────────────────────────────────────
 function escapeHtml(value) {
@@ -19,14 +21,26 @@ function escapeHtml(value) {
 // ── Status bar helpers ──────────────────────────────────────────
 function showStatus(message, type) {
   if (!statusEl) return;
-  statusEl.className = type || '';
+  statusEl.className = 'status-bar' + (type ? ' ' + type : '');
   statusEl.textContent = message;
 }
 
 function hideStatus() {
   if (!statusEl) return;
-  statusEl.className = '';
+  statusEl.className = 'status-bar';
   statusEl.textContent = '';
+}
+
+// ── Form toggle ─────────────────────────────────────────────────
+function showForm() {
+  form.classList.add('visible');
+  form.reset();
+  form.querySelector('#title').focus();
+}
+
+function hideForm() {
+  form.classList.remove('visible');
+  form.reset();
 }
 
 // ── Loading indicator helper ────────────────────────────────────
@@ -43,11 +57,30 @@ function toggleLoading(element, isLoading) {
   }
 }
 
+// ── Badge label formatter ───────────────────────────────────────
+function statusLabel(status) {
+  if (!status) return '';
+  return status.replace(/_/g, ' ');
+}
+
+function priorityLabel(priority) {
+  if (!priority) return '';
+  return priority.replace(/_/g, ' ');
+}
+
 // ── Todo item renderer ──────────────────────────────────────────
 function renderTodoItem(todo) {
   const li = document.createElement('li');
   li.className = 'todo-item';
   li.dataset.todoId = todo.id;
+
+  // Status class on the card itself
+  if (todo.status) {
+    li.classList.add('todo-item--' + todo.status);
+  }
+  if (todo.status === 'completed') {
+    li.classList.add('completed');
+  }
 
   const parts = [];
 
@@ -57,15 +90,40 @@ function renderTodoItem(todo) {
   titleEl.textContent = todo.title;
   parts.push(titleEl);
 
-  // Meta row: status · priority · category
-  const metaParts = [escapeHtml(todo.status), escapeHtml(todo.priority)];
-  if (todo.category) {
-    metaParts.push(escapeHtml(todo.category));
-  }
+  // Meta row with badges
   const metaEl = document.createElement('div');
   metaEl.className = 'todo-meta';
-  metaEl.textContent = metaParts.join(' · ');
-  parts.push(metaEl);
+
+  const badges = [];
+
+  if (todo.status) {
+    const badge = document.createElement('span');
+    badge.className = 'badge badge--' + (todo.status === 'completed' ? 'completed' : todo.status === 'in_progress' ? 'in_progress' : 'pending');
+    badge.textContent = statusLabel(todo.status);
+    badges.push(badge);
+  }
+
+  if (todo.priority) {
+    const badge = document.createElement('span');
+    badge.className = 'badge badge--priority-' + todo.priority.replace(/_/g, '-');
+    badge.textContent = priorityLabel(todo.priority);
+    badges.push(badge);
+  }
+
+  if (todo.category) {
+    const badge = document.createElement('span');
+    badge.className = 'badge badge--category';
+    badge.textContent = todo.category;
+    badges.push(badge);
+  }
+
+  for (const b of badges) {
+    metaEl.appendChild(b);
+  }
+
+  if (badges.length) {
+    parts.push(metaEl);
+  }
 
   // Description (optional)
   if (todo.description) {
@@ -86,8 +144,8 @@ function renderTodoItem(todo) {
 function renderEmptyState() {
   todosList.innerHTML = '';
   const li = document.createElement('li');
-  li.className = 'muted';
-  li.textContent = 'No todos yet.';
+  li.className = 'empty-state';
+  li.innerHTML = '<span class="empty-state__icon">📋</span>No todos yet.<br>Click <strong>+ New todo</strong> to get started.';
   todosList.appendChild(li);
 }
 
@@ -153,7 +211,7 @@ async function createTodo(event) {
   });
 
   if (!response.ok) throw new Error(`Unable to create todo (${response.status})`);
-  form.reset();
+  hideForm();
   await loadTodos();
 }
 
@@ -168,6 +226,9 @@ logoutButton.addEventListener('click', () => {
   logout();
   window.location.replace('/login');
 });
+
+btnAdd.addEventListener('click', showForm);
+btnCancel.addEventListener('click', hideForm);
 
 // ── Boot ────────────────────────────────────────────────────────
 (async () => {
