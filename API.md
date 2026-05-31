@@ -102,7 +102,8 @@ Content-Type: application/json
   "description": "Milk, eggs, bread",
   "category": "personal",
   "status": "pending",
-  "priority": "medium"
+  "priority": "medium",
+  "due_date": "2026-06-15T10:00:00Z"
 }
 ```
 
@@ -111,6 +112,7 @@ Content-Type: application/json
 - `category` - Optional
 - `status` - Optional; one of `pending`, `in_progress`, `completed` (default: `pending`)
 - `priority` - Optional; one of `low`, `medium`, `high` (default: `medium`)
+- `due_date` - Optional; ISO 8601 date-time string indicating the todo's due date
 
 Response: `201 Created` with the created todo object.
 
@@ -143,7 +145,8 @@ Content-Type: application/json
 
 {
   "status": "completed",
-  "priority": "low"
+  "priority": "low",
+  "due_date": "2026-06-15T10:00:00Z"
 }
 ```
 
@@ -163,6 +166,8 @@ Response: `200 OK` with deleted todo details.
 ### Users Table
 - `id` - Auto-incremented primary key
 - `user_id` - Unique user identifier derived from the JWT `sub` claim
+- `email` - User email address (optional, used for reminders)
+- `last_reminder_sent` - Timestamp of the last reminder email sent (optional)
 - `created_at` - Account creation timestamp
 
 ### Todos Table
@@ -176,6 +181,7 @@ Response: `200 OK` with deleted todo details.
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
 - `last_viewed` - Last time the todo was viewed or updated (used for "forgotten items" insights)
+- `due_date` - Optional due date for the todo (used for reminder emails)
 
 ## Insights: Forgotten Items
 The `last_viewed` field tracks the last time a user viewed or interacted with a todo. This can be used to highlight items that:

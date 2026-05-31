@@ -35,7 +35,8 @@ curl -X POST http://localhost:3000/todos \
   -d '{
     "title": "Buy groceries",
     "category": "personal",
-    "priority": "medium"
+    "priority": "medium",
+    "due_date": "2026-06-15T10:00:00Z"
   }'
 ```
 
@@ -107,6 +108,9 @@ Use `.env.example` as the template for local development.
 - `completed` - Done
 
 Requests with other status values return `400 Bad Request`.
+
+### Due Dates & Reminders
+Todos can have a `due_date` field. When configured with an SMTP server, the app sends reminder emails to users for todos with due dates within the next 48 hours.
 
 ### Priority Values
 - `low`

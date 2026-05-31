@@ -45,7 +45,9 @@ async function shouldSendReminder(userId) {
   const intervalParam = `${reminder.minIntervalMinutes} minutes`;
 
   const result = await getPool().query(
-    'SELECT last_reminder_sent FROM users WHERE user_id = $1',
+    `SELECT NOW() - last_reminder_sent > interval '${intervalParam}' AS eligible
+     FROM users
+     WHERE user_id = $1`,
     [userId]
   );
 
@@ -56,11 +58,8 @@ async function shouldSendReminder(userId) {
     return true;
   }
 
-  // Compare the last-sent timestamp to NOW() minus the minimum interval.
-  const lastSent = new Date(row.last_reminder_sent);
-  const nowMinusInterval = new Date(Date.now() - reminder.minIntervalMinutes * 60 * 1000);
-
-  return lastSent < nowMinusInterval;
+  // Use DB-side interval comparison to avoid client/server clock skew.
+  return row.eligible;
 }
 
 /**
@@ -140,8 +139,7 @@ let reminderIntervalId = null;
  * @returns {NodeJS.Timeout|null} interval ID, or null if email is disabled
  */
 function startReminderScheduler() {
-  const { reminder } = getConfig();
-  const { email } = getConfig();
+  const { reminder, email } = getConfig();
 
   // If the SMTP host is still the default (localhost), warn but don't block startup.
   if (email.host === 'localhost' && !process.env.EMAIL_HOST) {
