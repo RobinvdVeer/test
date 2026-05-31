@@ -4,55 +4,200 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Todos</title>
-    <style>
-      body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; }
-      header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-      .muted { color: #666; }
-      .row { display: flex; gap: 12px; flex-wrap: wrap; }
-      input, select, button, textarea { padding: 8px; font: inherit; }
-      form { display: grid; gap: 12px; margin: 20px 0; }
-      ul { list-style: none; padding: 0; }
-      li { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 10px 0; }
-      .todo-title { font-weight: 600; }
-      .todo-meta { font-size: 0.9rem; color: #555; }
-      .danger { color: #b00020; }
-    </style>
+    <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body>
-    <header>
-      <div>
-        <h1>Todos</h1>
-        <div class="muted">Your personal todo list</div>
-      </div>
-      <button id="logout">Logout</button>
-    </header>
+    <div class="app-shell">
 
-    <main>
-      <section id="status" class="muted"></section>
-
-      <form id="todo-form">
-        <input id="title" name="title" placeholder="Title" required />
-        <textarea id="description" name="description" placeholder="Description"></textarea>
-        <div class="row">
-          <input id="category" name="category" placeholder="Category" />
-          <select id="status-input" name="status">
-            <option value="">pending</option>
-            <option value="pending">pending</option>
-            <option value="in_progress">in_progress</option>
-            <option value="completed">completed</option>
-          </select>
-          <select id="priority" name="priority">
-            <option value="">medium</option>
-            <option value="low">low</option>
-            <option value="medium">medium</option>
-            <option value="high">high</option>
-          </select>
+      <!-- ── Navbar ─────────────────────────────────────────────── -->
+      <nav class="navbar">
+        <div class="navbar-brand">
+          <div class="navbar-brand-icon">
+            <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+          </div>
+          <span>Todos</span>
         </div>
-        <button type="submit">Add todo</button>
-      </form>
+        <div class="navbar-right">
+          <div class="navbar-search">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input id="search-input" type="text" placeholder="Search todos…" />
+          </div>
+          <span id="user-display" class="navbar-user"></span>
+          <button id="logout" class="btn btn-ghost btn-sm">Logout</button>
+        </div>
+      </nav>
 
-      <ul id="todos"></ul>
-    </main>
+      <!-- ── Main ───────────────────────────────────────────────── -->
+      <main class="main-content">
+
+        <!-- Summary cards -->
+        <section id="summary">
+          <!-- populated by JS -->
+        </section>
+
+        <!-- Create todo form -->
+        <section class="create-section">
+          <h3>New Todo</h3>
+          <form id="todo-form" class="create-form">
+            <div class="form-field">
+              <label for="title">Title</label>
+              <input id="title" name="title" placeholder="What needs to be done?" required />
+            </div>
+            <div class="form-field">
+              <label for="description">Description</label>
+              <textarea id="description" name="description" placeholder="Add details…"></textarea>
+            </div>
+            <div class="create-row">
+              <div class="form-field">
+                <label for="category">Category</label>
+                <input id="category" name="category" placeholder="e.g. Work, Personal" />
+              </div>
+              <div class="form-field">
+                <label for="due-date">Due Date</label>
+                <input id="due-date" name="due_date" type="date" />
+              </div>
+            </div>
+            <div class="create-row">
+              <div class="form-field">
+                <label for="status-input">Status</label>
+                <select id="status-input" name="status">
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="priority">Priority</label>
+                <select id="priority" name="priority">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              Add Todo
+            </button>
+          </form>
+        </section>
+
+        <!-- Toolbar: filters + sort -->
+        <section class="toolbar" id="toolbar">
+          <div class="toolbar-field">
+            <label for="filter-status">Status</label>
+            <select id="filter-status">
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+          <div class="toolbar-field">
+            <label for="filter-priority">Priority</label>
+            <select id="filter-priority">
+              <option value="">All</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div class="toolbar-field">
+            <label for="filter-category">Category</label>
+            <input id="filter-category" type="text" placeholder="Filter…" />
+          </div>
+          <div class="toolbar-field">
+            <label for="sort-by">Sort By</label>
+            <select id="sort-by">
+              <option value="created-desc">Created ↓</option>
+              <option value="created-asc">Created ↑</option>
+              <option value="title-asc">Title A-Z</option>
+              <option value="title-desc">Title Z-A</option>
+              <option value="due-asc">Due ↑</option>
+              <option value="priority-desc">Priority ↓</option>
+            </select>
+          </div>
+          <div class="toolbar-spacer"></div>
+          <span id="filter-count" class="toolbar-count"></span>
+        </section>
+
+        <!-- Todo list -->
+        <section>
+          <div class="section-header">
+            <h2>All Todos</h2>
+          </div>
+          <div id="todos">
+            <!-- populated by JS -->
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- ── Edit Modal ─────────────────────────────────────────── -->
+    <div id="edit-modal" class="modal-overlay hidden">
+      <div class="modal">
+        <h3>Edit Todo</h3>
+        <form id="edit-form" class="create-form">
+          <input type="hidden" id="edit-id" />
+          <div class="form-field">
+            <label for="edit-title">Title</label>
+            <input id="edit-title" required />
+          </div>
+          <div class="form-field">
+            <label for="edit-description">Description</label>
+            <textarea id="edit-description"></textarea>
+          </div>
+          <div class="create-row">
+            <div class="form-field">
+              <label for="edit-category">Category</label>
+              <input id="edit-category" />
+            </div>
+            <div class="form-field">
+              <label for="edit-due-date">Due Date</label>
+              <input id="edit-due-date" type="date" />
+            </div>
+          </div>
+          <div class="create-row">
+            <div class="form-field">
+              <label for="edit-status">Status</label>
+              <select id="edit-status">
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="edit-priority">Priority</label>
+              <select id="edit-priority">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" id="edit-cancel" class="btn btn-ghost">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── Confirm Delete Dialog ──────────────────────────────── -->
+    <div id="confirm-dialog" class="modal-overlay hidden">
+      <div class="modal confirm-dialog confirm-dialog-small">
+        <h3>Delete Todo</h3>
+        <p>Are you sure you want to delete this todo? This action cannot be undone.</p>
+        <div class="confirm-actions">
+          <button type="button" id="confirm-cancel" class="btn btn-ghost">Cancel</button>
+          <button type="button" id="confirm-delete" class="btn btn-primary btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Toast ──────────────────────────────────────────────── -->
+    <div id="toast" class="toast hidden"></div>
 
     <script type="module" src="/assets/app.js"></script>
   </body>
