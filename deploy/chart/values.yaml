@@ -47,11 +47,14 @@ app:
     scope: openid profile email
 
 secrets:
+  # secrets.create is a fallback for creating plain Kubernetes Secrets when external
+  # secrets stores (e.g. External Secrets Operator) are not available. Only enable this
+  # when externalSecrets.enabled is false.
   create: false
-  databaseUrl: ""
-  postgresPassword: ""
-  keycloakPostgresPassword: ""
-  keycloakAdminPassword: ""
+  # databaseUrl:      ""
+  # postgresPassword: ""
+  # keycloakPostgresPassword: ""
+  # keycloakAdminPassword: ""
 
 externalSecrets:
   enabled: false

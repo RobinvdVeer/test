@@ -10,5 +10,5 @@ metadata:
 binaryData: {}
 data:
   realm.json: |-
-{{ tpl (.Files.Get "files/keycloak-realm.json") . | indent 4 }}
+.Files.Get "files/keycloak-realm.json" | indent 4
 {{- end }}
