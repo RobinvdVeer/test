@@ -95,6 +95,7 @@ keycloak:
   clientId: todo-app
   publicUrl: http://localhost:8081
   hostname: localhost
+  hostnamePort: 8081
   auth:
     username: admin
     passwordSecretName: metrics-server-keycloak
