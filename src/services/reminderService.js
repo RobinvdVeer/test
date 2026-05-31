@@ -128,8 +128,78 @@ async function sendReminders() {
   };
 }
 
+let reminderIntervalId = null;
+
+/**
+ * Start the reminder scheduler:
+ *   - Logs a warning if email is not configured (default localhost)
+ *   - Calls sendReminders() immediately on startup
+ *   - Sets up a recurring setInterval based on REMINDER_CHECK_INTERVAL_MINUTES
+ *   - Returns the interval ID so it can be cleared on shutdown
+ *
+ * @returns {NodeJS.Timeout|null} interval ID, or null if email is disabled
+ */
+function startReminderScheduler() {
+  const { reminder } = getConfig();
+  const { email } = getConfig();
+
+  // If the SMTP host is still the default (localhost), warn but don't block startup.
+  if (email.host === 'localhost' && !process.env.EMAIL_HOST) {
+    console.warn(
+      'Reminder scheduler started but EMAIL_HOST is the default (localhost). '
+      + 'Set a real SMTP host to actually send emails.'
+    );
+  }
+
+  // Run immediately so reminders catch up on first boot.
+  sendReminders()
+    .then((summary) => {
+      console.log(
+        `Reminder scheduler initial run: ${summary.usersNotified} users notified, `
+        + `${summary.totalTodos} todos, ${summary.errors.length} errors`
+      );
+    })
+    .catch((err) => {
+      console.error('Reminder scheduler initial run failed:', err.message);
+    });
+
+  const intervalMs = reminder.checkIntervalMinutes * 60 * 1000;
+  reminderIntervalId = setInterval(() => {
+    console.log('Reminder scheduler running...');
+    sendReminders()
+      .then((summary) => {
+        console.log(
+          `Reminder scheduler run: ${summary.usersNotified} users notified, `
+          + `${summary.totalTodos} todos, ${summary.errors.length} errors`
+        );
+      })
+      .catch((err) => {
+        console.error('Reminder scheduler run failed:', err.message);
+      });
+  }, intervalMs);
+
+  console.log(
+    `Reminder scheduler started (every ${reminder.checkIntervalMinutes} min)`
+  );
+
+  return reminderIntervalId;
+}
+
+/**
+ * Stop the reminder scheduler, clearing the interval.
+ */
+function stopReminderScheduler() {
+  if (reminderIntervalId) {
+    clearInterval(reminderIntervalId);
+    reminderIntervalId = null;
+    console.log('Reminder scheduler stopped');
+  }
+}
+
 module.exports = {
   getDueSoonTodos,
   shouldSendReminder,
   sendReminders,
+  startReminderScheduler,
+  stopReminderScheduler,
 };

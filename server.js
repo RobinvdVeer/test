@@ -1,6 +1,7 @@
 const { createApp } = require('./src/app');
 const { getConfig } = require('./src/config');
 const { getPool, closePool } = require('./src/db/pool');
+const { stopReminderScheduler } = require('./src/services/reminderService');
 
 const { PORT } = getConfig();
 
@@ -31,6 +32,7 @@ if (require.main === module) {
 
     server.close(() => {
       console.log('HTTP server closed');
+      stopReminderScheduler();
       closePool()
         .then(() => {
           console.log('Database pool closed');
