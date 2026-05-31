@@ -12,10 +12,36 @@ function getConfig() {
   const tokenUrl = process.env.KEYCLOAK_TOKEN_URL || buildUrl(issuerUrl, 'protocol/openid-connect/token');
   const logoutUrl = process.env.KEYCLOAK_LOGOUT_URL || buildUrl(issuerUrl, 'protocol/openid-connect/logout');
 
+  const emailConfig = {
+    host: process.env.EMAIL_HOST || 'localhost',
+    port: process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587,
+    user: process.env.EMAIL_USER || undefined,
+    pass: process.env.EMAIL_PASS || undefined,
+    from: process.env.EMAIL_FROM || 'noreply@localhost',
+    secure: process.env.EMAIL_SECURE === 'true',
+  };
+
+  const reminderConfig = {
+    checkIntervalMinutes:
+      process.env.REMINDER_CHECK_INTERVAL_MINUTES
+        ? Number(process.env.REMINDER_CHECK_INTERVAL_MINUTES)
+        : 60,
+    dueSoonHours:
+      process.env.REMINDER_DUE_SOON_HOURS
+        ? Number(process.env.REMINDER_DUE_SOON_HOURS)
+        : 48,
+    minIntervalMinutes:
+      process.env.REMINDER_MIN_INTERVAL_MINUTES
+        ? Number(process.env.REMINDER_MIN_INTERVAL_MINUTES)
+        : 1440,
+  };
+
   return {
     PORT: process.env.PORT ? Number(process.env.PORT) : 3000,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV || 'development',
+    email: emailConfig,
+    reminder: reminderConfig,
     auth: {
       realm: keycloakRealm,
       clientId: keycloakClientId,

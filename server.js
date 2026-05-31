@@ -1,6 +1,7 @@
 const { createApp } = require('./src/app');
 const { getConfig } = require('./src/config');
 const { getPool, closePool } = require('./src/db/pool');
+const { startReminderScheduler, stopReminderScheduler } = require('./src/services/reminderService');
 
 const { PORT } = getConfig();
 
@@ -25,12 +26,16 @@ if (require.main === module) {
     console.log(`Todos require a Bearer JWT from Keycloak`);
   });
 
+  // Start the reminder scheduler (non-blocking) after the server is listening.
+  startReminderScheduler();
+
   process.on('SIGTERM', () => {
     console.log('SIGTERM signal received: closing HTTP server');
     if (!server) return;
 
     server.close(() => {
       console.log('HTTP server closed');
+      stopReminderScheduler();
       closePool()
         .then(() => {
           console.log('Database pool closed');

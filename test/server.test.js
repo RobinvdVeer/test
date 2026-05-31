@@ -466,8 +466,8 @@ describe('POST /todos', () => {
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
-      ['u1', 'new', null, null, 'pending', 'medium']
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed, due_date) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium', null]
     );
   });
 
@@ -485,8 +485,8 @@ describe('POST /todos', () => {
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
-      ['u1', 'new', null, null, 'pending', 'medium']
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed, due_date) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium', null]
     );
   });
 
@@ -504,8 +504,8 @@ describe('POST /todos', () => {
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
-      ['u1', 'new', null, null, 'pending', 'medium']
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed, due_date) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium', null]
     );
   });
 
@@ -523,8 +523,8 @@ describe('POST /todos', () => {
     expect(res.body).toEqual(row);
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
-      ['u1', 'new', null, null, 'pending', 'medium']
+      'INSERT INTO todos (user_id, title, description, category, status, priority, last_viewed, due_date) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7) RETURNING *',
+      ['u1', 'new', null, null, 'pending', 'medium', null]
     );
   });
 
