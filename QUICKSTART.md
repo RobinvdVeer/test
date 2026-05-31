@@ -142,6 +142,18 @@ Default is `last_viewed_desc` (most recently viewed first)
 psql -h localhost -U ${POSTGRES_USER:-todouser} -d ${POSTGRES_DB:-tododb}
 ```
 
+## Using with Kubernetes Port-Forward
+
+If you have a staging Keycloak deployment and want to connect your local app via port-forward:
+
+```bash
+# Port-forward both services from your staging namespace
+kubectl -n test-staging port-forward svc/app-staging-app 8080:80 &
+kubectl -n test-staging port-forward svc/app-staging-keycloak 8081:8080
+```
+
+Then the app will be available at `http://localhost:8080` and Keycloak at `http://localhost:8081`.
+
 ## Documentation
 
 - **Full API docs**: See [API.md](./API.md)

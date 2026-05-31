@@ -1,0 +1,53 @@
+# ⚠️ LOCAL PORT-FORWARD DEVELOPMENT CONFIG
+# Do NOT use this file for real staging deployment.
+# This file is only for local development using
+# `kubectl port-forward` to the staging namespace.
+# For real staging, use `values-staging.yaml` instead.
+image:
+  app:
+    repository: ghcr.io/robinvdveer/metrics-server
+    tag: latest
+
+replicaCount: 1
+
+app:
+  publicUrl: http://localhost:8080
+  auth:
+    issuerUrl: http://localhost:8081/realms/todos
+    authorizeUrl: http://localhost:8081/realms/todos/protocol/openid-connect/auth
+    tokenUrl: http://localhost:8081/realms/todos/protocol/openid-connect/token
+    logoutUrl: http://localhost:8081/realms/todos/protocol/openid-connect/logout
+    redirectUri: http://localhost:8080/auth/callback
+    postLogoutRedirectUri: http://localhost:8080/login
+
+keycloak:
+  publicUrl: http://localhost:8081
+  hostname: localhost
+  hostnamePort: 8081
+  ingress:
+    enabled: false
+
+ingress:
+  enabled: false
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: cluster-secret-store
+    kind: ClusterSecretStore
+  database:
+    remoteRef:
+      key: metrics-server/staging/database
+      property: database-url
+  postgresPassword:
+    remoteRef:
+      key: metrics-server/staging/postgres
+      property: postgres-password
+  keycloakPostgresPassword:
+    remoteRef:
+      key: metrics-server/staging/keycloak-postgres
+      property: postgres-password
+  keycloakAdminPassword:
+    remoteRef:
+      key: metrics-server/staging/keycloak
+      property: admin-password
