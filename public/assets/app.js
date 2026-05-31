@@ -40,10 +40,10 @@ function requireAuth() {
 function showToast(message, type = 'success') {
   toast.textContent = message;
   toast.className = `toast toast-${type}`;
-  toast.style.display = 'block';
+  toast.classList.remove('hidden');
   clearTimeout(toast._timer);
   toast._timer = setTimeout(() => {
-    toast.style.display = 'none';
+    toast.classList.add('hidden');
   }, 3000);
 }
 
@@ -352,12 +352,12 @@ function openEditModal(todo) {
   document.getElementById('edit-due-date').value = todo.due_date || '';
   document.getElementById('edit-status').value = todo.status || 'pending';
   document.getElementById('edit-priority').value = todo.priority || 'medium';
-  editModal.style.display = 'flex';
+  editModal.classList.remove('hidden');
   document.getElementById('edit-title').focus();
 }
 
 function closeEditModal() {
-  editModal.style.display = 'none';
+  editModal.classList.add('hidden');
   editForm.reset();
 }
 
@@ -384,12 +384,12 @@ async function handleEditSubmit(event) {
 // ===== Chunk 4: Delete Confirmation =====
 function openDeleteConfirm(id) {
   deleteTargetId = id;
-  confirmDialog.style.display = 'flex';
+  confirmDialog.classList.remove('hidden');
 }
 
 function closeDeleteConfirm() {
   deleteTargetId = null;
-  confirmDialog.style.display = 'none';
+  confirmDialog.classList.add('hidden');
 }
 
 async function handleDeleteConfirm() {
