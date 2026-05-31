@@ -35,6 +35,26 @@ async function getDueSoonTodos() {
 }
 
 /**
+ * Check whether enough time has elapsed since the user's last reminder,
+ * using a cached last_reminder_sent value (batched from sendReminders).
+ *
+ * @param {string}  userId
+ * @param {string}  lastReminderSent  – last_reminder_sent string from batch query
+ * @returns {boolean} true if we should send a reminder now
+ */
+function shouldSendReminderFromCache(userId, lastReminderSent) {
+  if (!lastReminderSent) {
+    return true;
+  }
+
+  const { reminder } = getConfig();
+  const lastSent = new Date(lastReminderSent);
+  const nowMinusInterval = new Date(Date.now() - reminder.minIntervalMinutes * 60 * 1000);
+
+  return lastSent < nowMinusInterval;
+}
+
+/**
  * Check whether enough time has elapsed since the user's last reminder.
  *
  * @param {string} userId
@@ -85,50 +105,74 @@ async function markReminderSent(userId) {
  * @returns {Promise<{usersNotified: number, totalTodos: number, errors: string[]}>}
  */
 async function sendReminders() {
-  const usersNotified = new Set();
-  let totalTodos = 0;
-  const errors = [];
-
-  const todosByUser = await getDueSoonTodos();
-
-  for (const [userId, todos] of todosByUser) {
-    // Skip if the user doesn't have an email on record.
-    const userResult = await getPool().query(
-      'SELECT email FROM users WHERE user_id = $1',
-      [userId]
-    );
-
-    const user = userResult.rows[0];
-    if (!user || !user.email) {
-      continue;
-    }
-
-    // Respect the per-user cooldown.
-    const eligible = await shouldSendReminder(userId);
-    if (!eligible) {
-      continue;
-    }
-
-    // Send the reminder email.
-    const emailResult = await sendReminderEmail({ to: user.email, todos });
-
-    if (emailResult.success) {
-      await markReminderSent(userId);
-      usersNotified.add(userId);
-      totalTodos += todos.length;
-    } else {
-      errors.push(`Failed to send reminder to ${user.email}: ${emailResult.error || 'unknown error'}`);
-    }
+  if (isRunning) {
+    console.log('Reminder scheduler: previous run still in progress, skipping');
+    return { usersNotified: 0, totalTodos: 0, errors: ['Previous run still in progress'] };
   }
 
-  return {
-    usersNotified: usersNotified.size,
-    totalTodos,
-    errors,
-  };
+  isRunning = true;
+
+  try {
+    const usersNotified = new Set();
+    let totalTodos = 0;
+    const errors = [];
+
+    const todosByUser = await getDueSoonTodos();
+
+    if (todosByUser.size === 0) {
+      return { usersNotified: 0, totalTodos: 0, errors: [] };
+    }
+
+    // Batch-fetch emails and last_reminder_sent for all users in a single query.
+    const userIds = Array.from(todosByUser.keys());
+    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(', ');
+    const userResult = await getPool().query(
+      `SELECT user_id, email, last_reminder_sent FROM users WHERE user_id IN (${placeholders})`,
+      userIds
+    );
+
+    const userMap = new Map();
+    for (const row of userResult.rows) {
+      userMap.set(row.user_id, row);
+    }
+
+    // Determine eligibility using the batched last_reminder_sent data.
+    for (const [userId, todos] of todosByUser) {
+      const user = userMap.get(userId);
+      if (!user || !user.email) {
+        continue;
+      }
+
+      // Respect the per-user cooldown using the batched data.
+      const eligible = await shouldSendReminderFromCache(userId, user.last_reminder_sent);
+      if (!eligible) {
+        continue;
+      }
+
+      // Send the reminder email.
+      const emailResult = await sendReminderEmail({ to: user.email, todos });
+
+      if (emailResult.success) {
+        await markReminderSent(userId);
+        usersNotified.add(userId);
+        totalTodos += todos.length;
+      } else {
+        errors.push(`Failed to send reminder to ${user.email}: ${emailResult.error || 'unknown error'}`);
+      }
+    }
+
+    return {
+      usersNotified: usersNotified.size,
+      totalTodos,
+      errors,
+    };
+  } finally {
+    isRunning = false;
+  }
 }
 
 let reminderIntervalId = null;
+let isRunning = false;
 
 /**
  * Start the reminder scheduler:
@@ -140,8 +184,7 @@ let reminderIntervalId = null;
  * @returns {NodeJS.Timeout|null} interval ID, or null if email is disabled
  */
 function startReminderScheduler() {
-  const { reminder } = getConfig();
-  const { email } = getConfig();
+  const { reminder, email } = getConfig();
 
   // If the SMTP host is still the default (localhost), warn but don't block startup.
   if (email.host === 'localhost' && !process.env.EMAIL_HOST) {
